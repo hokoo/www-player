@@ -3,11 +3,13 @@ const addZoneBtn = document.getElementById('addZone');
 const statusEl = document.getElementById('status');
 const overlayTimeInput = document.getElementById('overlayTime');
 const overlayCurveSelect = document.getElementById('overlayCurve');
+const stopFadeInput = document.getElementById('stopFadeTime');
 
 const SETTINGS_KEYS = {
   overlayTime: 'player:overlayTime',
   overlayCurve: 'player:overlayCurve',
   layout: 'player:zones',
+  stopFade: 'player:stopFade',
 };
 
 let currentAudio = null;
@@ -358,12 +360,13 @@ function applyOverlay(oldAudio, newAudio, targetVolume, overlaySeconds, curve, n
 async function handlePlay(file, button) {
   const overlaySeconds = Math.max(0, parseFloat(overlayTimeInput.value) || 0);
   const curve = overlayCurveSelect.value;
+  const stopFadeSeconds = Math.max(0, parseFloat(stopFadeInput.value) || 0);
   const targetVolume = clampVolume(loadVolume(file));
 
   button.disabled = true;
 
   if (currentFile === file && currentAudio && !currentAudio.paused) {
-    await fadeOutAndStop(currentAudio, overlaySeconds, curve, file);
+    await fadeOutAndStop(currentAudio, stopFadeSeconds, curve, file);
     setStatus(`Остановлено: ${file}`);
     button.disabled = false;
     return;
@@ -403,11 +406,18 @@ async function handlePlay(file, button) {
 function initSettings() {
   overlayTimeInput.value = loadSetting(SETTINGS_KEYS.overlayTime, '1.5');
   overlayCurveSelect.value = loadSetting(SETTINGS_KEYS.overlayCurve, 'linear');
+  stopFadeInput.value = loadSetting(SETTINGS_KEYS.stopFade, '0.5');
 
   overlayTimeInput.addEventListener('change', () => {
     const sanitized = Math.max(0, parseFloat(overlayTimeInput.value) || 0).toString();
     overlayTimeInput.value = sanitized;
     saveSetting(SETTINGS_KEYS.overlayTime, sanitized);
+  });
+
+  stopFadeInput.addEventListener('change', () => {
+    const sanitized = Math.max(0, parseFloat(stopFadeInput.value) || 0).toString();
+    stopFadeInput.value = sanitized;
+    saveSetting(SETTINGS_KEYS.stopFade, sanitized);
   });
 
   overlayCurveSelect.addEventListener('change', () => {
