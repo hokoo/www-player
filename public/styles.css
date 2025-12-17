@@ -33,13 +33,19 @@ body {
   box-shadow: 4px 0 16px rgba(0, 0, 0, 0.35);
   transition: width 0.2s ease, padding 0.2s ease;
   overflow: hidden;
+  position: relative;
 }
 
 .sidebar.collapsed {
-  width: 0;
-  min-width: 0;
-  padding: 0;
-  border-right: none;
+  width: 56px;
+  min-width: 56px;
+  padding: 12px 8px;
+  border-right: 1px solid var(--border);
+}
+
+.sidebar.collapsed .sidebar__header,
+.sidebar.collapsed .panel {
+  display: none;
 }
 
 .sidebar__header h1 {
@@ -237,7 +243,7 @@ button.secondary.ghost {
 .sidebar-toggle {
   position: absolute;
   top: 12px;
-  right: -52px;
+  right: 8px;
   width: 44px;
   height: 44px;
   border-radius: 12px;

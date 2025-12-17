@@ -452,7 +452,7 @@ function updateAddZoneState() {
 function setSidebarOpen(isOpen) {
   if (!sidebar || !sidebarToggle) return;
   sidebar.classList.toggle('collapsed', !isOpen);
-  sidebarToggle.textContent = isOpen ? 'Скрыть панель' : 'Показать панель';
+  sidebarToggle.textContent = isOpen ? '⟨' : '☰';
   saveSetting(SETTINGS_KEYS.sidebarOpen, isOpen ? '1' : '0');
 }
 
