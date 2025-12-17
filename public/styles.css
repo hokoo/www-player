@@ -336,6 +336,19 @@ button.danger {
   gap: 10px;
 }
 
+.server-actions__title {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.server-actions__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 button.secondary:disabled {
   background: var(--disabled);
   border-color: var(--border);
