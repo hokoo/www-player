@@ -7,6 +7,12 @@
   --muted: #cbd5e1;
   --border: #334155;
   --disabled: #475569;
+  --card: #111827;
+  --hint: #475569;
+  --shadow-accent: rgba(185, 28, 28, 0.4);
+  --shadow-accent-strong: rgba(185, 28, 28, 0.6);
+  --border-strong: #7f1d1d;
+  --track: #0b1220;
 }
 
 * { box-sizing: border-box; }
@@ -126,7 +132,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  background: #111827;
+  background: var(--card);
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
   min-height: 135px;
   cursor: grab;
@@ -143,7 +149,7 @@ body {
 
 .zones-hint {
   margin: 0;
-  color: #475569;
+  color: var(--hint);
   font-size: 14px;
 }
 
@@ -202,7 +208,7 @@ button.play {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  box-shadow: 0 0 14px rgba(185, 28, 28, 0.4);
+  box-shadow: 0 0 14px var(--shadow-accent);
   height: 44px;
   min-width: 44px;
   justify-content: center;
@@ -220,7 +226,7 @@ button.play:disabled {
 .play.is-playing {
   background: var(--primary);
   color: #fff;
-  box-shadow: 0 0 14px rgba(185, 28, 28, 0.6);
+  box-shadow: 0 0 14px var(--shadow-accent-strong);
 }
 
 button.secondary {
@@ -243,7 +249,7 @@ button.secondary.ghost {
 
 .zone.drag-over {
   border-color: var(--primary);
-  background: #1f2937;
+  background: var(--panel);
 }
 
 .sidebar-toggle {
@@ -274,7 +280,7 @@ button.secondary.ghost {
   height: 10px;
   -webkit-appearance: none;
   appearance: none;
-  background: #0b1220;
+  background: var(--track);
   border: 1px solid var(--border);
   border-radius: 999px;
 }
@@ -286,8 +292,8 @@ button.secondary.ghost {
   height: 20px;
   border-radius: 50%;
   background: var(--primary);
-  border: 1px solid #7f1d1d;
-  box-shadow: 0 0 0 2px #0b1220;
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 0 0 2px var(--track);
   cursor: pointer;
 }
 
@@ -296,13 +302,13 @@ button.secondary.ghost {
   height: 20px;
   border-radius: 50%;
   background: var(--primary);
-  border: 1px solid #7f1d1d;
-  box-shadow: 0 0 0 2px #0b1220;
+  border: 1px solid var(--border-strong);
+  box-shadow: 0 0 0 2px var(--track);
   cursor: pointer;
 }
 
 .volume input[type='range']::-moz-range-track {
-  background: #0b1220;
+  background: var(--track);
   border: 1px solid var(--border);
   border-radius: 999px;
 }
