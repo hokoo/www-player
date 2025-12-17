@@ -4,12 +4,15 @@ const statusEl = document.getElementById('status');
 const overlayTimeInput = document.getElementById('overlayTime');
 const overlayCurveSelect = document.getElementById('overlayCurve');
 const stopFadeInput = document.getElementById('stopFadeTime');
+const sidebar = document.getElementById('sidebar');
+const sidebarToggle = document.getElementById('sidebarToggle');
 
 const SETTINGS_KEYS = {
   overlayTime: 'player:overlayTime',
   overlayCurve: 'player:overlayCurve',
   layout: 'player:zones',
   stopFade: 'player:stopFade',
+  sidebarOpen: 'player:sidebarOpen',
 };
 
 let currentAudio = null;
@@ -446,6 +449,23 @@ function updateAddZoneState() {
   addZoneBtn.disabled = disabled;
 }
 
+function setSidebarOpen(isOpen) {
+  if (!sidebar || !sidebarToggle) return;
+  sidebar.classList.toggle('collapsed', !isOpen);
+  sidebarToggle.textContent = isOpen ? 'Скрыть панель' : 'Показать панель';
+  saveSetting(SETTINGS_KEYS.sidebarOpen, isOpen ? '1' : '0');
+}
+
+function initSidebarToggle() {
+  const saved = loadSetting(SETTINGS_KEYS.sidebarOpen, '1');
+  setSidebarOpen(saved !== '0');
+  sidebarToggle.addEventListener('click', () => {
+    const openNow = !sidebar.classList.contains('collapsed');
+    setSidebarOpen(!openNow);
+  });
+}
+
 initSettings();
 initZonesControls();
+initSidebarToggle();
 fetchTracks();

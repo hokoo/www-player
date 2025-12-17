@@ -18,29 +18,52 @@ body {
   color: var(--text);
 }
 
-header {
-  background: var(--panel);
-  color: var(--text);
-  padding: 16px 24px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.35);
-}
-
-header h1 {
-  margin: 0 0 4px;
-  font-size: 24px;
-}
-
-header p {
-  margin: 0;
-  opacity: 0.9;
-  font-size: 14px;
-}
-
-main {
+.layout {
+  display: flex;
   width: 100%;
-  max-width: none;
-  margin: 24px auto;
-  padding: 0 16px 32px;
+  min-height: 100vh;
+}
+
+.sidebar {
+  width: 320px;
+  min-width: 280px;
+  background: var(--panel);
+  border-right: 1px solid var(--border);
+  padding: 16px 16px 32px;
+  box-shadow: 4px 0 16px rgba(0, 0, 0, 0.35);
+  transition: width 0.2s ease, padding 0.2s ease;
+  overflow: hidden;
+}
+
+.sidebar.collapsed {
+  width: 0;
+  min-width: 0;
+  padding: 0;
+  border-right: none;
+}
+
+.sidebar__header h1 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.sidebar__header p {
+  margin: 0 0 12px;
+  opacity: 0.9;
+  font-size: 13px;
+}
+
+.content {
+  flex: 1;
+  padding: 24px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.content-header {
+  display: flex;
+  justify-content: flex-start;
 }
 
 .panel {
@@ -50,6 +73,17 @@ main {
   padding: 16px;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   margin: 0 auto 16px;
+  width: fit-content;
+  max-width: 1600px;
+}
+
+.sidebar-panel {
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+.zones-panel {
   width: fit-content;
   max-width: 1600px;
 }
@@ -186,6 +220,13 @@ button.secondary {
   font-weight: 600;
   cursor: pointer;
   box-shadow: 0 10px 20px rgba(185, 28, 28, 0.35);
+}
+
+button.secondary.ghost {
+  background: transparent;
+  color: var(--text);
+  border-color: var(--border);
+  box-shadow: none;
 }
 
 .zone.drag-over {
