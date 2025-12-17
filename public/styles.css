@@ -1,0 +1,139 @@
+:root {
+  --primary: #1f7a8c;
+  --accent: #bfdbf7;
+  --background: #f4f8fb;
+  --text: #0f172a;
+  --border: #d1d9e0;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  background: var(--background);
+  color: var(--text);
+}
+
+header {
+  background: var(--primary);
+  color: #fff;
+  padding: 16px 24px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+header h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+}
+
+header p {
+  margin: 0;
+  opacity: 0.9;
+  font-size: 14px;
+}
+
+main {
+  max-width: 960px;
+  margin: 24px auto;
+  padding: 0 16px 32px;
+}
+
+.panel {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06);
+  margin-bottom: 16px;
+}
+
+.settings {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+
+.settings label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-weight: 600;
+}
+
+.settings input,
+.settings select {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 14px;
+  background: #f9fbfd;
+}
+
+.track-card {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: center;
+  background: #fff;
+  box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
+}
+
+.track-name {
+  font-weight: 700;
+  margin: 0;
+  word-break: break-word;
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+button.play {
+  background: var(--primary);
+  color: #fff;
+  border: none;
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  box-shadow: 0 10px 20px rgba(31, 122, 140, 0.3);
+}
+
+button.play:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.volume {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 220px;
+}
+
+.volume input[type='range'] {
+  flex: 1;
+}
+
+.empty-state {
+  text-align: center;
+  padding: 24px;
+  color: #6b7280;
+}
+
+.status {
+  margin: 8px 0 0;
+  font-size: 14px;
+  color: #475569;
+}
