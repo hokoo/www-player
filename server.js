@@ -6,6 +6,7 @@ const PORT = process.env.PORT || 3000;
 const AUDIO_DIR = path.join(__dirname, 'audio');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.flac']);
+let shuttingDown = false;
 
 function isAudioFile(filename) {
   return AUDIO_EXTENSIONS.has(path.extname(filename).toLowerCase());
@@ -64,6 +65,22 @@ function handleApiAudio(req, res) {
   });
 }
 
+function handleShutdown(req, res) {
+  if (shuttingDown) {
+    sendJson(res, 409, { message: 'Server is already stopping' });
+    return;
+  }
+
+  shuttingDown = true;
+  sendJson(res, 200, { message: 'Server is stopping' });
+  console.log('Shutdown requested. Stopping server...');
+
+  const exit = () => process.exit(0);
+  server.close(exit);
+  // Fallback in case there are open connections preventing close
+  setTimeout(exit, 1000).unref();
+}
+
 function handleAudioFile(req, res, pathname) {
   const requested = pathname.replace(/^\/audio\//, '');
   const filePath = safePath(AUDIO_DIR, requested);
@@ -104,19 +121,39 @@ const server = http.createServer((req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
   const pathname = decodeURIComponent(url.pathname);
 
-  if (req.method !== 'GET') {
-    res.writeHead(405);
-    res.end('Method Not Allowed');
+  if (pathname === '/api/shutdown') {
+    if (req.method !== 'POST') {
+      res.writeHead(405);
+      res.end('Method Not Allowed');
+      return;
+    }
+    handleShutdown(req, res);
     return;
   }
 
   if (pathname === '/api/audio') {
+    if (req.method !== 'GET') {
+      res.writeHead(405);
+      res.end('Method Not Allowed');
+      return;
+    }
     handleApiAudio(req, res);
     return;
   }
 
   if (pathname.startsWith('/audio/')) {
+    if (req.method !== 'GET') {
+      res.writeHead(405);
+      res.end('Method Not Allowed');
+      return;
+    }
     handleAudioFile(req, res, pathname);
+    return;
+  }
+
+  if (req.method !== 'GET') {
+    res.writeHead(405);
+    res.end('Method Not Allowed');
     return;
   }
 

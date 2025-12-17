@@ -6,6 +6,7 @@ const overlayCurveSelect = document.getElementById('overlayCurve');
 const stopFadeInput = document.getElementById('stopFadeTime');
 const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebarToggle');
+const stopServerBtn = document.getElementById('stopServer');
 
 const SETTINGS_KEYS = {
   overlayTime: 'player:overlayTime',
@@ -476,7 +477,40 @@ function initSidebarToggle() {
   });
 }
 
+async function stopServer() {
+  if (!stopServerBtn) return;
+  stopServerBtn.disabled = true;
+  setStatus('Останавливаем сервер...');
+
+  try {
+    const res = await fetch('/api/shutdown', { method: 'POST' });
+    if (!res.ok) {
+      throw new Error('Request failed');
+    }
+    setStatus('Сервер останавливается. Окно будет закрыто.');
+    // Попытка закрыть вкладку/окно после успешной остановки
+    setTimeout(() => {
+      try {
+        window.open('', '_self');
+        window.close();
+      } catch (err) {
+        console.error('Не удалось закрыть окно', err);
+      }
+    }, 300);
+  } catch (err) {
+    console.error(err);
+    setStatus('Не удалось остановить сервер. Попробуйте ещё раз.');
+    stopServerBtn.disabled = false;
+  }
+}
+
+function initServerControls() {
+  if (!stopServerBtn) return;
+  stopServerBtn.addEventListener('click', stopServer);
+}
+
 initSettings();
 initZonesControls();
 initSidebarToggle();
+initServerControls();
 fetchTracks();

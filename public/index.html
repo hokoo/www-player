@@ -1,59 +1,72 @@
 <!DOCTYPE html>
 <html lang="ru">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ЧГК аудио-плеер</title>
-    <link rel="stylesheet" href="/styles.css" />
-  </head>
-  <body>
-    <div class="layout">
-      <aside class="sidebar" id="sidebar">
-        <button id="sidebarToggle" class="secondary ghost sidebar-toggle" aria-label="Toggle panel">☰</button>
-        <header class="sidebar__header">
-          <h1>ЧГК Плеер</h1>
-          <p>Загрузите аудио в папку <strong>/audio</strong> приложения.</p>
-        </header>
-        <section class="panel sidebar-panel">
-          <div class="settings">
-            <label>
-              Перекрытия треков (сек)
-              <input type="number" id="overlayTime" min="0" step="0.1" />
-            </label>
-            <label>
-              Затухание при остановке (сек)
-              <input type="number" id="stopFadeTime" min="0" step="0.1" />
-            </label>
-            <label>
-              Функция изменения громкости
-              <select id="overlayCurve">
-                <option value="linear">Linear</option>
-                <option value="ease-in">Ease-in</option>
-                <option value="ease-out">Ease-out</option>
-                <option value="ease-in-out">Ease-in-out</option>
-              </select>
-            </label>
-          </div>
-          <p class="status" id="status"></p>
-        </section>
-        <section class="panel sidebar-panel sidebar-repo">
+<head>
+	<meta charset="UTF-8"/>
+	<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+	<title>ЧГК аудио-плеер</title>
+	<link rel="stylesheet" href="/styles.css"/>
+</head>
+<body>
+<div class="layout">
+	<aside class="sidebar" id="sidebar">
+		<button id="sidebarToggle" class="secondary ghost sidebar-toggle" aria-label="Toggle panel">☰</button>
+		<header class="sidebar__header">
+			<h1>ЧГК Плеер</h1>
+			<p>Загрузите аудио в папку <strong>/audio</strong> приложения.</p>
+		</header>
+		<section class="panel sidebar-panel">
+			<div class="settings">
+				<label>
+					Перекрытия треков (сек)
+					<input type="number" id="overlayTime" min="0" step="0.1"/>
+				</label>
+				<label>
+					Затухание при остановке (сек)
+					<input type="number" id="stopFadeTime" min="0" step="0.1"/>
+				</label>
+				<label>
+					Функция изменения громкости
+					<select id="overlayCurve">
+						<option value="linear">Linear</option>
+						<option value="ease-in">Ease-in</option>
+						<option value="ease-out">Ease-out</option>
+						<option value="ease-in-out">Ease-in-out</option>
+					</select>
+				</label>
+			</div>
+			<p class="status" id="status"></p>
+		</section>
+
+		<section class="panel sidebar-panel">
+			<div class="server-actions">
+				<div>
+					<p class="server-actions__title">Управление сервером</p>
+					<p class="server-actions__hint">Если нужно завершить работу, нажмите кнопку ниже. Сервер остановится
+						и страница перестанет отвечать.</p>
+				</div>
+				<button id="stopServer" class="secondary danger">Остановить сервер</button>
+			</div>
+		</section>
+
+		<section class="panel sidebar-panel sidebar-repo">
 			<p class="sidebar-repo__title">Репозиторий проекта
-				<a class="sidebar-repo__link" href="https://github.com/hokoo/www-player" target="_blank" rel="noopener noreferrer">на GitHub</a>
+				<a class="sidebar-repo__link" href="https://github.com/hokoo/www-player" target="_blank"
+				   rel="noopener noreferrer">на GitHub</a>
 			</p>
-        </section>
-      </aside>
+		</section>
+	</aside>
 
-      <main class="content">
-        <div class="content-header"></div>
-        <section class="panel zones-panel">
-          <div class="zones-actions">
-            <button id="addZone" class="secondary">Добавить поле</button>
-          </div>
-          <div id="zones" class="zones"></div>
-        </section>
-      </main>
-    </div>
+	<main class="content">
+		<div class="content-header"></div>
+		<section class="panel zones-panel">
+			<div class="zones-actions">
+				<button id="addZone" class="secondary">Добавить поле</button>
+			</div>
+			<div id="zones" class="zones"></div>
+		</section>
+	</main>
+</div>
 
-    <script src="/script.js" type="module"></script>
-  </body>
+<script src="/script.js" type="module"></script>
+</body>
 </html>
