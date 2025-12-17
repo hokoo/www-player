@@ -34,7 +34,7 @@ header p {
 }
 
 main {
-  max-width: 960px;
+  max-width: 1280px;
   margin: 24px auto;
   padding: 0 16px 32px;
 }
@@ -82,6 +82,12 @@ main {
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
 }
 
+#tracks {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
 .track-name {
   font-weight: 700;
   margin: 0;
@@ -99,7 +105,7 @@ button.play {
   background: var(--primary);
   color: #fff;
   border: none;
-  padding: 10px 14px;
+  padding: 0 14px;
   border-radius: 10px;
   font-weight: 700;
   cursor: pointer;
@@ -107,6 +113,11 @@ button.play {
   align-items: center;
   gap: 6px;
   box-shadow: 0 10px 20px rgba(31, 122, 140, 0.3);
+  height: 44px;
+  min-width: 44px;
+  justify-content: center;
+  line-height: 1;
+  font-size: 18px;
 }
 
 button.play:disabled {
