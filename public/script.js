@@ -266,6 +266,48 @@ function resetFadeState() {
   fadeCancel = { cancelled: false };
 }
 
+function fadeOutAndStop(audio, durationSeconds, curve, file) {
+  return new Promise((resolve) => {
+    if (!audio) return resolve();
+    const duration = Math.max(0, durationSeconds || 0) * 1000;
+    if (duration === 0) {
+      audio.pause();
+      audio.currentTime = 0;
+      setButtonPlaying(file, false);
+      if (currentFile === file) {
+        currentAudio = null;
+        currentFile = null;
+      }
+      return resolve();
+    }
+    resetFadeState();
+    const token = fadeCancel;
+    const start = performance.now();
+    const startVolume = clampVolume(audio.volume);
+
+    function step(now) {
+      if (token.cancelled) return;
+      const progress = Math.min((now - start) / duration, 1);
+      const eased = easing(progress, curve);
+      audio.volume = clampVolume(startVolume * (1 - eased));
+      if (progress < 1) {
+        requestAnimationFrame(step);
+      } else {
+        audio.pause();
+        audio.currentTime = 0;
+        setButtonPlaying(file, false);
+        if (currentFile === file) {
+          currentAudio = null;
+          currentFile = null;
+        }
+        resolve();
+      }
+    }
+
+    requestAnimationFrame(step);
+  });
+}
+
 function createAudio(file) {
   const encoded = encodeURIComponent(file);
   const audio = new Audio(`/audio/${encoded}`);
@@ -321,10 +363,7 @@ async function handlePlay(file, button) {
   button.disabled = true;
 
   if (currentFile === file && currentAudio && !currentAudio.paused) {
-    currentAudio.pause();
-    currentAudio.currentTime = 0;
-    resetFadeState();
-    setButtonPlaying(file, false);
+    await fadeOutAndStop(currentAudio, overlaySeconds, curve, file);
     setStatus(`Остановлено: ${file}`);
     button.disabled = false;
     return;
