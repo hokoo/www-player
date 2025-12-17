@@ -1,6 +1,9 @@
 @echo off
 setlocal enableextensions enabledelayedexpansion
 
+rem Включаем UTF-8, чтобы корректно показывать кириллицу
+chcp 65001 >nul
+
 rem Change to repository directory
 cd /d "%~dp0"
 

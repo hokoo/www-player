@@ -487,7 +487,16 @@ async function stopServer() {
     if (!res.ok) {
       throw new Error('Request failed');
     }
-    setStatus('Сервер останавливается. Можно закрыть окно.');
+    setStatus('Сервер останавливается. Окно будет закрыто.');
+    // Попытка закрыть вкладку/окно после успешной остановки
+    setTimeout(() => {
+      try {
+        window.open('', '_self');
+        window.close();
+      } catch (err) {
+        console.error('Не удалось закрыть окно', err);
+      }
+    }, 300);
   } catch (err) {
     console.error(err);
     setStatus('Не удалось остановить сервер. Попробуйте ещё раз.');
