@@ -2,20 +2,15 @@ const tracksContainer = document.getElementById('tracks');
 const statusEl = document.getElementById('status');
 const overlayTimeInput = document.getElementById('overlayTime');
 const overlayCurveSelect = document.getElementById('overlayCurve');
-const fileInput = document.getElementById('fileInput');
 
 const SETTINGS_KEYS = {
   overlayTime: 'player:overlayTime',
   overlayCurve: 'player:overlayCurve',
 };
 
-const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.flac']);
-
 let currentAudio = null;
-let currentTrack = null;
+let currentFile = null;
 let fadeCancel = { cancelled: false };
-let objectUrls = [];
-let tracks = [];
 
 const easing = (t, type) => {
   switch (type) {
@@ -43,23 +38,88 @@ function saveSetting(key, value) {
   localStorage.setItem(key, value);
 }
 
-function volumeKey(track) {
-  return `player:volume:${track.id}`;
+function volumeKey(file) {
+  return `player:volume:${file}`;
 }
 
-function loadVolume(track) {
-  const saved = localStorage.getItem(volumeKey(track));
+function loadVolume(file) {
+  const saved = localStorage.getItem(volumeKey(file));
   const parsed = saved !== null ? parseFloat(saved) : NaN;
   if (Number.isNaN(parsed)) return 1;
   return Math.max(0, Math.min(1, parsed));
 }
 
-function saveVolume(track, value) {
-  localStorage.setItem(volumeKey(track), value.toString());
+function saveVolume(file, value) {
+  localStorage.setItem(volumeKey(file), value.toString());
 }
 
 function renderEmpty() {
-  tracksContainer.innerHTML = '<div class="empty-state">Выберите папку или файлы, чтобы показать треки.</div>';
+  tracksContainer.innerHTML = '<div class="empty-state">В папке /audio не найдено аудиофайлов (mp3, wav, ogg, m4a, flac).</div>';
+}
+
+function createTrackRow(file) {
+  const card = document.createElement('div');
+  card.className = 'track-card';
+
+  const info = document.createElement('div');
+  const name = document.createElement('p');
+  name.className = 'track-name';
+  name.textContent = file;
+  info.appendChild(name);
+
+  const controls = document.createElement('div');
+  controls.className = 'controls';
+
+  const playButton = document.createElement('button');
+  playButton.className = 'play';
+  playButton.textContent = '▶ Воспроизвести';
+  playButton.addEventListener('click', () => handlePlay(file, playButton));
+
+  const volumeWrap = document.createElement('label');
+  volumeWrap.className = 'volume';
+  const volumeRange = document.createElement('input');
+  volumeRange.type = 'range';
+  volumeRange.min = '0';
+  volumeRange.max = '1';
+  volumeRange.step = '0.01';
+  volumeRange.value = loadVolume(file).toString();
+  const volumeValue = document.createElement('span');
+  volumeValue.textContent = Math.round(parseFloat(volumeRange.value) * 100) + '%';
+
+  volumeRange.addEventListener('input', () => {
+    saveVolume(file, parseFloat(volumeRange.value));
+    volumeValue.textContent = Math.round(parseFloat(volumeRange.value) * 100) + '%';
+    if (currentFile === file && currentAudio) {
+      currentAudio.volume = parseFloat(volumeRange.value);
+    }
+  });
+
+  volumeWrap.append(volumeRange, volumeValue);
+  controls.append(playButton, volumeWrap);
+
+  card.append(info, controls);
+  return card;
+}
+
+async function fetchTracks() {
+  try {
+    const res = await fetch('/api/audio');
+    if (!res.ok) throw new Error('Не удалось получить список файлов');
+    const data = await res.json();
+    const files = Array.isArray(data.files) ? data.files : [];
+    if (!files.length) {
+      renderEmpty();
+      setStatus('Файлы не найдены. Добавьте аудио в папку /audio и обновите страницу.');
+      return;
+    }
+    tracksContainer.innerHTML = '';
+    files.forEach((file) => tracksContainer.appendChild(createTrackRow(file)));
+    setStatus(`Найдено файлов: ${files.length}`);
+  } catch (err) {
+    console.error(err);
+    renderEmpty();
+    setStatus('Ошибка загрузки списка файлов. Проверьте сервер.');
+  }
 }
 
 function resetFadeState() {
@@ -67,18 +127,18 @@ function resetFadeState() {
   fadeCancel = { cancelled: false };
 }
 
-function createAudio(track) {
-  const audio = new Audio(track.url);
-  audio.dataset.trackId = track.id;
+function createAudio(file) {
+  const encoded = encodeURIComponent(file);
+  const audio = new Audio(`/audio/${encoded}`);
   audio.addEventListener('ended', () => {
-    if (currentTrack && currentTrack.id === track.id) {
-      setStatus(`Воспроизведение завершено: ${track.label}`);
+    if (currentFile === file) {
+      setStatus(`Воспроизведение завершено: ${file}`);
     }
   });
   return audio;
 }
 
-function applyOverlay(oldAudio, newAudio, targetVolume, overlaySeconds, curve, track) {
+function applyOverlay(oldAudio, newAudio, targetVolume, overlaySeconds, curve) {
   const start = performance.now();
   const duration = overlaySeconds * 1000;
   const initialOldVolume = oldAudio ? oldAudio.volume : 1;
@@ -102,27 +162,28 @@ function applyOverlay(oldAudio, newAudio, targetVolume, overlaySeconds, curve, t
         oldAudio.volume = initialOldVolume;
       }
       currentAudio = newAudio;
-      currentTrack = track;
-      setStatus(`Играет: ${track.label}`);
+      currentFile = newAudio.dataset.filename;
+      setStatus(`Играет: ${currentFile}`);
     }
   }
 
   requestAnimationFrame(step);
 }
 
-async function handlePlay(track, button) {
+async function handlePlay(file, button) {
   const overlaySeconds = Math.max(0, parseFloat(overlayTimeInput.value) || 0);
   const curve = overlayCurveSelect.value;
-  const targetVolume = loadVolume(track);
+  const targetVolume = loadVolume(file);
 
   button.disabled = true;
-  const audio = createAudio(track);
+  const audio = createAudio(file);
+  audio.dataset.filename = file;
   audio.volume = overlaySeconds > 0 && currentAudio && !currentAudio.paused ? 0 : targetVolume;
 
   try {
     await audio.play();
     if (currentAudio && !currentAudio.paused && overlaySeconds > 0) {
-      applyOverlay(currentAudio, audio, targetVolume, overlaySeconds, curve, track);
+      applyOverlay(currentAudio, audio, targetVolume, overlaySeconds, curve);
     } else {
       if (currentAudio) {
         currentAudio.pause();
@@ -131,8 +192,8 @@ async function handlePlay(track, button) {
       resetFadeState();
       audio.volume = targetVolume;
       currentAudio = audio;
-      currentTrack = track;
-      setStatus(`Играет: ${track.label}`);
+      currentFile = file;
+      setStatus(`Играет: ${file}`);
     }
   } catch (err) {
     console.error(err);
@@ -140,92 +201,6 @@ async function handlePlay(track, button) {
   } finally {
     button.disabled = false;
   }
-}
-
-function createTrackRow(track) {
-  const card = document.createElement('div');
-  card.className = 'track-card';
-
-  const info = document.createElement('div');
-  const name = document.createElement('p');
-  name.className = 'track-name';
-  name.textContent = track.label;
-  info.appendChild(name);
-
-  const controls = document.createElement('div');
-  controls.className = 'controls';
-
-  const playButton = document.createElement('button');
-  playButton.className = 'play';
-  playButton.textContent = '▶ Воспроизвести';
-  playButton.addEventListener('click', () => handlePlay(track, playButton));
-
-  const volumeWrap = document.createElement('label');
-  volumeWrap.className = 'volume';
-  const volumeRange = document.createElement('input');
-  volumeRange.type = 'range';
-  volumeRange.min = '0';
-  volumeRange.max = '1';
-  volumeRange.step = '0.01';
-  volumeRange.value = loadVolume(track).toString();
-  const volumeValue = document.createElement('span');
-  volumeValue.textContent = Math.round(parseFloat(volumeRange.value) * 100) + '%';
-
-  volumeRange.addEventListener('input', () => {
-    const numeric = parseFloat(volumeRange.value);
-    saveVolume(track, numeric);
-    volumeValue.textContent = Math.round(numeric * 100) + '%';
-    if (currentTrack && currentTrack.id === track.id && currentAudio) {
-      currentAudio.volume = numeric;
-    }
-  });
-
-  volumeWrap.append(volumeRange, volumeValue);
-  controls.append(playButton, volumeWrap);
-
-  card.append(info, controls);
-  return card;
-}
-
-function renderTracks() {
-  if (!tracks.length) {
-    renderEmpty();
-    return;
-  }
-  tracksContainer.innerHTML = '';
-  tracks.forEach((track) => tracksContainer.appendChild(createTrackRow(track)));
-  setStatus(`Найдено файлов: ${tracks.length}`);
-}
-
-function isAudioFile(file) {
-  const ext = file.name.split('.').pop();
-  if (!ext) return false;
-  return AUDIO_EXTENSIONS.has(`.${ext.toLowerCase()}`);
-}
-
-function revokeObjectUrls() {
-  objectUrls.forEach((url) => URL.revokeObjectURL(url));
-  objectUrls = [];
-}
-
-function handleFilesSelected(fileList) {
-  revokeObjectUrls();
-  tracks = Array.from(fileList)
-    .filter((f) => isAudioFile(f))
-    .map((file) => {
-      const url = URL.createObjectURL(file);
-      objectUrls.push(url);
-      const label = file.webkitRelativePath || file.name;
-      const id = `${file.name}-${file.size}-${file.lastModified}`;
-      return { id, url, label };
-    });
-
-  if (!tracks.length) {
-    renderEmpty();
-    setStatus('Аудиофайлы не найдены в выбранных элементах.');
-    return;
-  }
-  renderTracks();
 }
 
 function initSettings() {
@@ -243,14 +218,5 @@ function initSettings() {
   });
 }
 
-function initPicker() {
-  fileInput.addEventListener('change', (event) => {
-    const files = event.target.files || [];
-    handleFilesSelected(files);
-  });
-}
-
 initSettings();
-initPicker();
-renderEmpty();
-setStatus('Выберите аудио-файлы или папку, чтобы начать.');
+fetchTracks();

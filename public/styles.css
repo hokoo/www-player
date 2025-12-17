@@ -54,25 +54,6 @@ main {
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
 }
 
-.picker {
-  display: grid;
-  gap: 8px;
-}
-
-.picker-label {
-  font-weight: 700;
-}
-
-.picker input[type='file'] {
-  padding: 8px 0;
-}
-
-.picker-hint {
-  margin: 0;
-  color: #475569;
-  font-size: 14px;
-}
-
 .settings label {
   display: flex;
   flex-direction: column;
