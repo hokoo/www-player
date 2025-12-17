@@ -128,7 +128,7 @@ body {
   gap: 10px;
   background: #111827;
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
-  min-height: 170px;
+  min-height: 135px;
   cursor: grab;
   max-width: 250px;
 }
