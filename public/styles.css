@@ -51,7 +51,7 @@ main {
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
   margin: 0 auto 16px;
   width: fit-content;
-  max-width: 1200px;
+  max-width: 1600px;
 }
 
 .settings {
@@ -91,7 +91,7 @@ main {
   box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
   min-height: 170px;
   cursor: grab;
-  max-width: 300px;
+  max-width: 250px;
 }
 
 .zones-actions {
@@ -112,9 +112,8 @@ main {
   display: flex;
   gap: 12px;
   flex-wrap: nowrap;
-  overflow-x: auto;
-  padding-bottom: 6px;
-  transform: rotateX(180deg); /* move scrollbar to top */
+  overflow: hidden;
+  max-width: 1600px;
 }
 
 .zone {
@@ -128,7 +127,6 @@ main {
   gap: 10px;
   min-width: 260px;
   flex: 0 0 auto;
-  transform: rotateX(180deg); /* revert content orientation */
 }
 
 .zone-body {
