@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Аудио-плеер</title>
+    <title>ЧГК аудио-плеер</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -11,17 +11,17 @@
       <aside class="sidebar" id="sidebar">
         <button id="sidebarToggle" class="secondary ghost sidebar-toggle" aria-label="Toggle panel">☰</button>
         <header class="sidebar__header">
-          <h1>Плеер аудио-каталога</h1>
-          <p>Файлы из папки <strong>/audio</strong>, перекрытие и индивидуальные громкости.</p>
+          <h1>ЧГК Плеер</h1>
+          <p>Файлы из папки <strong>/audio</strong> приложения.</p>
         </header>
         <section class="panel sidebar-panel">
           <div class="settings">
             <label>
-              Время перекрытия (секунды)
+              Перекрытия треков (сек)
               <input type="number" id="overlayTime" min="0" step="0.1" />
             </label>
             <label>
-              Затухание при остановке (секунды)
+              Затухание при остановке (сек)
               <input type="number" id="stopFadeTime" min="0" step="0.1" />
             </label>
             <label>
@@ -43,7 +43,6 @@
         <section class="panel zones-panel">
           <div class="zones-actions">
             <button id="addZone" class="secondary">Добавить поле</button>
-            <p class="zones-hint">Перетаскивайте треки между полями или внутри поля. Раскладка сохраняется.</p>
           </div>
           <div id="zones" class="zones"></div>
         </section>

@@ -1,0 +1,7 @@
+# Ignore audio folder
+audio/
+
+# Ignore IDE specific files
+.vscode/
+.idea/
+.DS_Store
