@@ -116,6 +116,20 @@ function buildTrackCard(file) {
   const volumeValue = document.createElement('span');
   volumeValue.textContent = Math.round(parseFloat(volumeRange.value) * 100) + '%';
 
+  const enableDrag = () => {
+    card.draggable = true;
+  };
+  const disableDrag = () => {
+    card.draggable = false;
+  };
+
+  ['pointerdown', 'mousedown', 'touchstart'].forEach((event) => {
+    volumeRange.addEventListener(event, disableDrag);
+  });
+  ['pointerup', 'mouseup', 'touchend', 'touchcancel', 'pointerleave'].forEach((event) => {
+    volumeRange.addEventListener(event, enableDrag);
+  });
+
   volumeRange.addEventListener('input', () => {
     const numeric = clampVolume(parseFloat(volumeRange.value));
     volumeRange.value = numeric.toString();
