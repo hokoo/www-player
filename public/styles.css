@@ -53,6 +53,8 @@ main {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  max-width: 720px;
+  margin: 0 auto;
 }
 
 .settings label {
@@ -105,6 +107,7 @@ main {
   flex-wrap: nowrap;
   overflow-x: auto;
   padding-bottom: 6px;
+  transform: rotateX(180deg); /* move scrollbar to top */
 }
 
 .zone {
@@ -118,13 +121,7 @@ main {
   gap: 10px;
   min-width: 260px;
   flex: 0 0 auto;
-}
-
-.zone-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  font-weight: 700;
+  transform: rotateX(180deg); /* revert content orientation */
 }
 
 .zone-body {

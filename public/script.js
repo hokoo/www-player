@@ -16,6 +16,7 @@ let fadeCancel = { cancelled: false };
 let buttonsByFile = new Map();
 let layout = [[]]; // array of zones -> array of filenames
 let availableFiles = [];
+const MAX_ZONES = 5;
 
 function clampVolume(value) {
   if (!Number.isFinite(value)) return 0;
@@ -150,7 +151,10 @@ function loadLayout(files) {
   }
 
   // filter to existing files
-  parsed = parsed.map((zone) => zone.filter((file) => files.includes(file))).filter((zone) => zone.length);
+  parsed = parsed
+    .slice(0, MAX_ZONES)
+    .map((zone) => zone.filter((file) => files.includes(file)))
+    .filter((zone) => zone.length);
 
   const used = new Set(parsed.flat());
   const missing = files.filter((f) => !used.has(f));
@@ -187,18 +191,16 @@ function renderZones() {
     });
     zone.addEventListener('drop', (e) => handleDrop(e, zoneIndex));
 
-    const header = document.createElement('div');
-    header.className = 'zone-header';
-    header.textContent = `Зона ${zoneIndex + 1}`;
-
     const body = document.createElement('div');
     body.className = 'zone-body';
 
     zoneFiles.forEach((file) => body.appendChild(buildTrackCard(file)));
 
-    zone.append(header, body);
+    zone.append(body);
     zonesContainer.appendChild(zone);
   });
+
+  updateAddZoneState();
 }
 
 function handleDrop(event, targetZoneIndex) {
@@ -376,10 +378,23 @@ function initSettings() {
 
 function initZonesControls() {
   addZoneBtn.addEventListener('click', () => {
+    if (layout.length >= MAX_ZONES) {
+      setStatus(`Максимум полей: ${MAX_ZONES}`);
+      updateAddZoneState();
+      return;
+    }
     layout.push([]);
     saveLayout();
     renderZones();
   });
+
+  updateAddZoneState();
+}
+
+function updateAddZoneState() {
+  if (!addZoneBtn) return;
+  const disabled = layout.length >= MAX_ZONES;
+  addZoneBtn.disabled = disabled;
 }
 
 initSettings();
