@@ -1,7 +1,7 @@
 @echo off
 setlocal enableextensions enabledelayedexpansion
 
-rem Включаем UTF-8, чтобы корректно показывать кириллицу
+rem Use UTF-8 to display messages correctly
 chcp 65001 >nul
 
 rem Change to repository directory
@@ -9,15 +9,15 @@ cd /d "%~dp0"
 
 where node >nul 2>nul
 if errorlevel 1 (
-  echo Node.js не найден. Установите Node.js версии 18 или новее: https://nodejs.org/
+  echo Node.js not found. Install Node.js v18 or newer: https://nodejs.org/
   pause
   exit /b 1
 )
 
-echo Запускаем ЧГК плеер...
+echo Starting CHGK player...
 start "" "http://localhost:3000/"
 
-rem Стартуем сервер
+rem Start server
 npm start
 
 endlocal
