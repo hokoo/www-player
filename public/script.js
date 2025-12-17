@@ -1,5 +1,4 @@
 const zonesContainer = document.getElementById('zones');
-const addZoneBtn = document.getElementById('addZone');
 const statusEl = document.getElementById('status');
 const overlayTimeInput = document.getElementById('overlayTime');
 const overlayCurveSelect = document.getElementById('overlayCurve');
@@ -20,9 +19,9 @@ let currentAudio = null;
 let currentFile = null;
 let fadeCancel = { cancelled: false };
 let buttonsByFile = new Map();
-let layout = [[]]; // array of zones -> array of filenames
-let availableFiles = [];
 const MAX_ZONES = 5;
+let layout = Array.from({ length: MAX_ZONES }, () => []); // array of zones -> array of filenames
+let availableFiles = [];
 
 function clampVolume(value) {
   if (!Number.isFinite(value)) return 0;
@@ -157,6 +156,14 @@ function attachDragHandlers(card) {
   });
 }
 
+function ensureZoneCount(zones) {
+  const normalized = Array.isArray(zones) ? zones.slice(0, MAX_ZONES) : [];
+  while (normalized.length < MAX_ZONES) {
+    normalized.push([]);
+  }
+  return normalized.map((zone) => (Array.isArray(zone) ? zone : []));
+}
+
 function loadLayout(files) {
   availableFiles = files;
   const raw = localStorage.getItem(SETTINGS_KEYS.layout);
@@ -167,17 +174,16 @@ function loadLayout(files) {
     parsed = [];
   }
 
-  // filter to existing files
-  parsed = parsed
-    .slice(0, MAX_ZONES)
-    .map((zone) => zone.filter((file) => files.includes(file)))
-    .filter((zone) => zone.length);
+  parsed = ensureZoneCount(
+    parsed.slice(0, MAX_ZONES).map((zone) => (Array.isArray(zone) ? zone.filter((file) => files.includes(file)) : [])),
+  );
 
   const used = new Set(parsed.flat());
   const missing = files.filter((f) => !used.has(f));
 
-  if (!parsed.length) {
-    parsed = [files];
+  const allZonesEmpty = parsed.every((zone) => zone.length === 0);
+  if (allZonesEmpty) {
+    parsed[0] = files.slice();
   } else if (missing.length) {
     parsed[0] = parsed[0].concat(missing);
   }
@@ -193,6 +199,7 @@ function saveLayout() {
 function renderZones() {
   zonesContainer.innerHTML = '';
   buttonsByFile = new Map();
+  layout = ensureZoneCount(layout);
 
   layout.forEach((zoneFiles, zoneIndex) => {
     const zone = document.createElement('div');
@@ -216,8 +223,6 @@ function renderZones() {
     zone.append(body);
     zonesContainer.appendChild(zone);
   });
-
-  updateAddZoneState();
 }
 
 function handleDrop(event, targetZoneIndex) {
@@ -240,16 +245,16 @@ function handleDrop(event, targetZoneIndex) {
 
 function moveFile(fromZone, toZone, file, beforeFile) {
   if (fromZone === -1 || toZone === -1) return;
-  const sourceList = layout[fromZone];
+  const normalizedLayout = ensureZoneCount(layout);
+  const sourceList = normalizedLayout[fromZone];
   const idx = sourceList.indexOf(file);
   if (idx !== -1) {
     sourceList.splice(idx, 1);
   }
-  const targetList = layout[toZone];
+  const targetList = normalizedLayout[toZone];
   const insertIndex = beforeFile ? Math.max(0, targetList.indexOf(beforeFile)) : targetList.length;
   targetList.splice(insertIndex, 0, file);
-  layout = layout.filter((z) => z.length); // drop empty zones
-  if (!layout.length) layout = [[]];
+  layout = ensureZoneCount(normalizedLayout);
   saveLayout();
 }
 
@@ -440,27 +445,6 @@ function initSettings() {
   });
 }
 
-function initZonesControls() {
-  addZoneBtn.addEventListener('click', () => {
-    if (layout.length >= MAX_ZONES) {
-      setStatus(`Максимум полей: ${MAX_ZONES}`);
-      updateAddZoneState();
-      return;
-    }
-    layout.push([]);
-    saveLayout();
-    renderZones();
-  });
-
-  updateAddZoneState();
-}
-
-function updateAddZoneState() {
-  if (!addZoneBtn) return;
-  const disabled = layout.length >= MAX_ZONES;
-  addZoneBtn.disabled = disabled;
-}
-
 function setSidebarOpen(isOpen) {
   if (!sidebar || !sidebarToggle) return;
   sidebar.classList.toggle('collapsed', !isOpen);
@@ -510,7 +494,6 @@ function initServerControls() {
 }
 
 initSettings();
-initZonesControls();
 initSidebarToggle();
 initServerControls();
 fetchTracks();

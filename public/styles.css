@@ -173,7 +173,7 @@ body {
   display: flex;
   flex-direction: column;
   gap: 10px;
-  min-width: 260px;
+  min-width: 272px;
   flex: 0 0 auto;
 }
 
