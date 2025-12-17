@@ -31,7 +31,13 @@
         <p class="status" id="status"></p>
       </section>
 
-      <section class="panel" id="tracks"></section>
+      <section class="panel">
+        <div class="zones-actions">
+          <button id="addZone" class="secondary">Добавить зону</button>
+          <p class="zones-hint">Перетаскивайте треки между зонами или внутри зоны. Раскладка сохраняется.</p>
+        </div>
+        <div id="zones" class="zones"></div>
+      </section>
     </main>
 
     <script src="/script.js" type="module"></script>

@@ -80,12 +80,52 @@ main {
   background: #fff;
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
   min-height: 170px;
+  cursor: grab;
 }
 
-#tracks {
+.zones-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.zones-hint {
+  margin: 0;
+  color: #475569;
+  font-size: 14px;
+}
+
+.zones {
   display: grid;
   gap: 12px;
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+.zone {
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  background: #f9fbfd;
+  min-height: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.zone-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-weight: 700;
+}
+
+.zone-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 160px;
 }
 
 .track-name {
@@ -126,6 +166,21 @@ button.play:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   box-shadow: none;
+}
+
+button.secondary {
+  background: #e2e8f0;
+  color: var(--text);
+  border: 1px solid var(--border);
+  padding: 10px 14px;
+  border-radius: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.zone.drag-over {
+  border-color: var(--primary);
+  background: #ecfeff;
 }
 
 .volume {

@@ -1,4 +1,5 @@
-const tracksContainer = document.getElementById('tracks');
+const zonesContainer = document.getElementById('zones');
+const addZoneBtn = document.getElementById('addZone');
 const statusEl = document.getElementById('status');
 const overlayTimeInput = document.getElementById('overlayTime');
 const overlayCurveSelect = document.getElementById('overlayCurve');
@@ -6,12 +7,15 @@ const overlayCurveSelect = document.getElementById('overlayCurve');
 const SETTINGS_KEYS = {
   overlayTime: 'player:overlayTime',
   overlayCurve: 'player:overlayCurve',
+  layout: 'player:zones',
 };
 
 let currentAudio = null;
 let currentFile = null;
 let fadeCancel = { cancelled: false };
 let buttonsByFile = new Map();
+let layout = [[]]; // array of zones -> array of filenames
+let availableFiles = [];
 
 function clampVolume(value) {
   if (!Number.isFinite(value)) return 0;
@@ -62,7 +66,7 @@ function saveVolume(file, value) {
 }
 
 function renderEmpty() {
-  tracksContainer.innerHTML = '<div class="empty-state">В папке /audio не найдено аудиофайлов (mp3, wav, ogg, m4a, flac).</div>';
+  zonesContainer.innerHTML = '<div class="empty-state">В папке /audio не найдено аудиофайлов (mp3, wav, ogg, m4a, flac).</div>';
 }
 
 function setButtonPlaying(file, isPlaying) {
@@ -73,9 +77,11 @@ function setButtonPlaying(file, isPlaying) {
   btn.classList.toggle('is-playing', isPlaying);
 }
 
-function createTrackRow(file) {
+function buildTrackCard(file) {
   const card = document.createElement('div');
   card.className = 'track-card';
+  card.draggable = true;
+  card.dataset.file = file;
 
   const info = document.createElement('div');
   const name = document.createElement('p');
@@ -116,9 +122,120 @@ function createTrackRow(file) {
 
   volumeWrap.append(volumeRange, volumeValue);
   controls.append(playButton, volumeWrap);
-
   card.append(info, controls);
+  attachDragHandlers(card);
   return card;
+}
+
+function attachDragHandlers(card) {
+  card.addEventListener('dragstart', (e) => {
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', card.dataset.file);
+    card.classList.add('dragging');
+  });
+
+  card.addEventListener('dragend', () => {
+    card.classList.remove('dragging');
+  });
+}
+
+function loadLayout(files) {
+  availableFiles = files;
+  const raw = localStorage.getItem(SETTINGS_KEYS.layout);
+  let parsed = [];
+  try {
+    parsed = raw ? JSON.parse(raw) : [];
+  } catch (err) {
+    parsed = [];
+  }
+
+  // filter to existing files
+  parsed = parsed.map((zone) => zone.filter((file) => files.includes(file))).filter((zone) => zone.length);
+
+  const used = new Set(parsed.flat());
+  const missing = files.filter((f) => !used.has(f));
+
+  if (!parsed.length) {
+    parsed = [files];
+  } else if (missing.length) {
+    parsed[0] = parsed[0].concat(missing);
+  }
+
+  layout = parsed;
+  saveLayout();
+}
+
+function saveLayout() {
+  localStorage.setItem(SETTINGS_KEYS.layout, JSON.stringify(layout));
+}
+
+function renderZones() {
+  zonesContainer.innerHTML = '';
+  buttonsByFile = new Map();
+
+  layout.forEach((zoneFiles, zoneIndex) => {
+    const zone = document.createElement('div');
+    zone.className = 'zone';
+    zone.dataset.zoneIndex = zoneIndex.toString();
+
+    zone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      zone.classList.add('drag-over');
+    });
+    zone.addEventListener('dragleave', () => {
+      zone.classList.remove('drag-over');
+    });
+    zone.addEventListener('drop', (e) => handleDrop(e, zoneIndex));
+
+    const header = document.createElement('div');
+    header.className = 'zone-header';
+    header.textContent = `Зона ${zoneIndex + 1}`;
+
+    const body = document.createElement('div');
+    body.className = 'zone-body';
+
+    zoneFiles.forEach((file) => body.appendChild(buildTrackCard(file)));
+
+    zone.append(header, body);
+    zonesContainer.appendChild(zone);
+  });
+}
+
+function handleDrop(event, targetZoneIndex) {
+  event.preventDefault();
+  const file = event.dataTransfer.getData('text/plain');
+  const sourceZoneIndex = findZoneIndex(file);
+  if (sourceZoneIndex === -1 || file === '') return;
+
+  const targetZone = event.currentTarget;
+  targetZone.classList.remove('drag-over');
+
+  const zoneFiles = layout[targetZoneIndex];
+  const dropTargetCard = event.target.closest('.track-card');
+  const beforeFile = dropTargetCard ? dropTargetCard.dataset.file : null;
+
+  moveFile(sourceZoneIndex, targetZoneIndex, file, beforeFile);
+  renderZones();
+  setStatus('Раскладка обновлена и сохранена.');
+}
+
+function moveFile(fromZone, toZone, file, beforeFile) {
+  if (fromZone === -1 || toZone === -1) return;
+  const sourceList = layout[fromZone];
+  const idx = sourceList.indexOf(file);
+  if (idx !== -1) {
+    sourceList.splice(idx, 1);
+  }
+  const targetList = layout[toZone];
+  const insertIndex = beforeFile ? Math.max(0, targetList.indexOf(beforeFile)) : targetList.length;
+  targetList.splice(insertIndex, 0, file);
+  layout = layout.filter((z) => z.length); // drop empty zones
+  if (!layout.length) layout = [[]];
+  saveLayout();
+}
+
+function findZoneIndex(file) {
+  return layout.findIndex((zone) => zone.includes(file));
 }
 
 async function fetchTracks() {
@@ -132,9 +249,8 @@ async function fetchTracks() {
       setStatus('Файлы не найдены. Добавьте аудио в папку /audio и обновите страницу.');
       return;
     }
-    tracksContainer.innerHTML = '';
-    buttonsByFile = new Map();
-    files.forEach((file) => tracksContainer.appendChild(createTrackRow(file)));
+    loadLayout(files);
+    renderZones();
     setStatus(`Найдено файлов: ${files.length}`);
   } catch (err) {
     console.error(err);
@@ -258,5 +374,14 @@ function initSettings() {
   });
 }
 
+function initZonesControls() {
+  addZoneBtn.addEventListener('click', () => {
+    layout.push([]);
+    saveLayout();
+    renderZones();
+  });
+}
+
 initSettings();
+initZonesControls();
 fetchTracks();
