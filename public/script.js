@@ -12,6 +12,13 @@ let currentAudio = null;
 let currentFile = null;
 let fadeCancel = { cancelled: false };
 
+function clampVolume(value) {
+  if (!Number.isFinite(value)) return 0;
+  if (value < 0) return 0;
+  if (value > 1) return 1;
+  return value;
+}
+
 const easing = (t, type) => {
   switch (type) {
     case 'ease-in':
@@ -46,11 +53,11 @@ function loadVolume(file) {
   const saved = localStorage.getItem(volumeKey(file));
   const parsed = saved !== null ? parseFloat(saved) : NaN;
   if (Number.isNaN(parsed)) return 1;
-  return Math.max(0, Math.min(1, parsed));
+  return clampVolume(parsed);
 }
 
 function saveVolume(file, value) {
-  localStorage.setItem(volumeKey(file), value.toString());
+  localStorage.setItem(volumeKey(file), clampVolume(value).toString());
 }
 
 function renderEmpty() {
@@ -87,10 +94,12 @@ function createTrackRow(file) {
   volumeValue.textContent = Math.round(parseFloat(volumeRange.value) * 100) + '%';
 
   volumeRange.addEventListener('input', () => {
-    saveVolume(file, parseFloat(volumeRange.value));
-    volumeValue.textContent = Math.round(parseFloat(volumeRange.value) * 100) + '%';
+    const numeric = clampVolume(parseFloat(volumeRange.value));
+    volumeRange.value = numeric.toString();
+    saveVolume(file, numeric);
+    volumeValue.textContent = Math.round(numeric * 100) + '%';
     if (currentFile === file && currentAudio) {
-      currentAudio.volume = parseFloat(volumeRange.value);
+      currentAudio.volume = numeric;
     }
   });
 
@@ -139,9 +148,10 @@ function createAudio(file) {
 }
 
 function applyOverlay(oldAudio, newAudio, targetVolume, overlaySeconds, curve) {
+  const safeTargetVolume = clampVolume(targetVolume);
   const start = performance.now();
   const duration = overlaySeconds * 1000;
-  const initialOldVolume = oldAudio ? oldAudio.volume : 1;
+  const initialOldVolume = clampVolume(oldAudio ? oldAudio.volume : 1);
   resetFadeState();
   const token = fadeCancel;
 
@@ -149,9 +159,9 @@ function applyOverlay(oldAudio, newAudio, targetVolume, overlaySeconds, curve) {
     if (token.cancelled) return;
     const progress = Math.min((now - start) / duration, 1);
     const eased = easing(progress, curve);
-    newAudio.volume = targetVolume * eased;
+    newAudio.volume = clampVolume(safeTargetVolume * eased);
     if (oldAudio) {
-      oldAudio.volume = initialOldVolume * (1 - eased);
+      oldAudio.volume = clampVolume(initialOldVolume * (1 - eased));
     }
     if (progress < 1) {
       requestAnimationFrame(step);
@@ -173,7 +183,7 @@ function applyOverlay(oldAudio, newAudio, targetVolume, overlaySeconds, curve) {
 async function handlePlay(file, button) {
   const overlaySeconds = Math.max(0, parseFloat(overlayTimeInput.value) || 0);
   const curve = overlayCurveSelect.value;
-  const targetVolume = loadVolume(file);
+  const targetVolume = clampVolume(loadVolume(file));
 
   button.disabled = true;
   const audio = createAudio(file);
