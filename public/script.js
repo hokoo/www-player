@@ -113,8 +113,6 @@ function buildTrackCard(file) {
   volumeRange.max = '1';
   volumeRange.step = '0.01';
   volumeRange.value = loadVolume(file).toString();
-  const volumeValue = document.createElement('span');
-  volumeValue.textContent = Math.round(parseFloat(volumeRange.value) * 100) + '%';
 
   const enableDrag = () => {
     card.draggable = true;
@@ -134,13 +132,12 @@ function buildTrackCard(file) {
     const numeric = clampVolume(parseFloat(volumeRange.value));
     volumeRange.value = numeric.toString();
     saveVolume(file, numeric);
-    volumeValue.textContent = Math.round(numeric * 100) + '%';
     if (currentFile === file && currentAudio) {
       currentAudio.volume = numeric;
     }
   });
 
-  volumeWrap.append(volumeRange, volumeValue);
+  volumeWrap.append(volumeRange);
   controls.append(playButton, volumeWrap);
   card.append(info, controls);
   attachDragHandlers(card);

@@ -259,10 +259,12 @@ button.secondary.ghost {
   align-items: center;
   gap: 8px;
   min-width: 220px;
+  width: 100%;
 }
 
 .volume input[type='range'] {
   flex: 1;
+  height: 10px;
 }
 
 .empty-state {
