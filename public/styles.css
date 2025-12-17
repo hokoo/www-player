@@ -34,7 +34,8 @@ header p {
 }
 
 main {
-  max-width: 1280px;
+  width: 100%;
+  max-width: none;
   margin: 24px auto;
   padding: 0 16px 32px;
 }
@@ -81,6 +82,7 @@ main {
   box-shadow: 0 6px 16px rgba(15, 23, 42, 0.05);
   min-height: 170px;
   cursor: grab;
+  max-width: 300px;
 }
 
 .zones-actions {
@@ -98,9 +100,11 @@ main {
 }
 
 .zones {
-  display: grid;
+  display: flex;
   gap: 12px;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  padding-bottom: 6px;
 }
 
 .zone {
@@ -112,6 +116,8 @@ main {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  min-width: 260px;
+  flex: 0 0 auto;
 }
 
 .zone-header {
