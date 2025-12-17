@@ -39,6 +39,9 @@ body {
   box-shadow: 4px 0 16px rgba(0, 0, 0, 0.35);
   transition: width 0.2s ease, padding 0.2s ease;
   position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
 }
 
 .sidebar.collapsed {
@@ -355,4 +358,38 @@ button.secondary:disabled {
   color: var(--muted);
   box-shadow: none;
   cursor: not-allowed;
+}
+
+.sidebar-repo {
+  margin-top: auto;
+  width: 100%;
+  max-width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sidebar-repo__title {
+  margin: 0 0 6px;
+  font-size: 14px;
+  color: var(--muted);
+}
+
+.sidebar-repo__link {
+  display: inline;
+  color: var(--muted);
+  font-weight: 600;
+  font-size: 13px;
+  text-decoration: underline;
+  padding: 0;
+  border: none;
+  background: transparent;
+  box-shadow: none;
+}
+
+.sidebar-repo__link:hover,
+.sidebar-repo__link:focus-visible {
+  color: #fff;
+  outline: none;
 }
