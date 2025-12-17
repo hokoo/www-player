@@ -247,6 +247,12 @@ button.secondary.ghost {
   box-shadow: none;
 }
 
+button.danger {
+  background: #7f1d1d;
+  border-color: #7f1d1d;
+  box-shadow: 0 10px 20px rgba(127, 29, 29, 0.35);
+}
+
 .zone.drag-over {
   border-color: var(--primary);
   background: var(--panel);
@@ -322,6 +328,30 @@ button.secondary.ghost {
   margin: 8px 0 0;
   font-size: 14px;
   color: var(--muted);
+}
+
+.server-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 18px 0 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.server-actions__title {
+  margin: 0 0 4px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.server-actions__hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 button.secondary:disabled {
