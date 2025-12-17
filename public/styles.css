@@ -234,6 +234,20 @@ button.secondary.ghost {
   background: #1f2937;
 }
 
+.sidebar-toggle {
+  position: absolute;
+  top: 12px;
+  right: -52px;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  padding: 0;
+}
+
 .volume {
   display: flex;
   align-items: center;
