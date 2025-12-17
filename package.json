@@ -1,9 +1,0 @@
-{
-  "name": "www-player",
-  "version": "1.0.0",
-  "description": "Specialized audio player with per-track controls and overlay transitions.",
-  "main": "server.js",
-  "scripts": {
-    "start": "node server.js"
-  }
-}

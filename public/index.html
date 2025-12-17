@@ -9,9 +9,17 @@
   <body>
     <header>
       <h1>Плеер аудио-каталога</h1>
-      <p>Отображает все файлы из папки <strong>/audio</strong>, с перекрытием дорожек и индивидуальными громкостями.</p>
+      <p>Работает прямо из файла: выберите папку или файлы, и плеер построит список треков с перекрытием и отдельными громкостями.</p>
     </header>
     <main>
+      <section class="panel">
+        <div class="picker">
+          <label class="picker-label" for="fileInput">Выберите папку или файлы</label>
+          <input type="file" id="fileInput" accept="audio/*" webkitdirectory multiple />
+          <p class="picker-hint">Браузер даст доступ только к выбранным файлам. Можно выбрать папку <strong>audio/</strong> или любую другую.</p>
+        </div>
+      </section>
+
       <section class="panel">
         <div class="settings">
           <label>
