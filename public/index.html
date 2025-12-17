@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Аудио-плеер</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <button id="sidebarToggle" class="secondary ghost sidebar-toggle" aria-label="Toggle panel">☰</button>
+        <header class="sidebar__header">
+          <h1>Плеер аудио-каталога</h1>
+          <p>Файлы из папки <strong>/audio</strong>, перекрытие и индивидуальные громкости.</p>
+        </header>
+        <section class="panel sidebar-panel">
+          <div class="settings">
+            <label>
+              Время перекрытия (секунды)
+              <input type="number" id="overlayTime" min="0" step="0.1" />
+            </label>
+            <label>
+              Затухание при остановке (секунды)
+              <input type="number" id="stopFadeTime" min="0" step="0.1" />
+            </label>
+            <label>
+              Функция изменения громкости
+              <select id="overlayCurve">
+                <option value="linear">Linear</option>
+                <option value="ease-in">Ease-in</option>
+                <option value="ease-out">Ease-out</option>
+                <option value="ease-in-out">Ease-in-out</option>
+              </select>
+            </label>
+          </div>
+          <p class="status" id="status"></p>
+          <div class="sidebar-footer">
+            <a href="https://github.com/" target="_blank" rel="noreferrer">Репозиторий проекта</a>
+          </div>
+        </section>
+      </aside>
+
+      <main class="content">
+        <div class="content-header"></div>
+        <section class="panel zones-panel">
+          <div class="zones-actions">
+            <button id="addZone" class="secondary">Добавить поле</button>
+            <p class="zones-hint">Перетаскивайте треки между полями или внутри поля. Раскладка сохраняется.</p>
+          </div>
+          <div id="zones" class="zones"></div>
+        </section>
+      </main>
+    </div>
+
+    <script src="/script.js" type="module"></script>
+  </body>
+</html>
