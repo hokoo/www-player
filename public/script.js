@@ -30,6 +30,12 @@ function clampVolume(value) {
   return value;
 }
 
+function stripExtension(filename) {
+  const lastDot = filename.lastIndexOf('.');
+  if (lastDot <= 0) return filename;
+  return filename.slice(0, lastDot);
+}
+
 const easing = (t, type) => {
   switch (type) {
     case 'ease-in':
@@ -44,7 +50,7 @@ const easing = (t, type) => {
 };
 
 function setStatus(message) {
-  statusEl.textContent = message;
+  if (statusEl) statusEl.textContent = message;
 }
 
 function loadSetting(key, fallback) {
@@ -92,7 +98,7 @@ function buildTrackCard(file) {
   const info = document.createElement('div');
   const name = document.createElement('p');
   name.className = 'track-name';
-  name.textContent = file;
+  name.textContent = stripExtension(file);
   info.appendChild(name);
 
   const controls = document.createElement('div');
