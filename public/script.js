@@ -105,17 +105,24 @@ function setButtonPlaying(file, isPlaying) {
   }
 }
 
+// Only trust the real duration reported by the browser.
+function getDuration(audio) {
+  const d = audio ? audio.duration : NaN;
+  return Number.isFinite(d) && d > 0 ? d : null;
+}
+
 function updateProgress(file, currentTime, duration) {
   const entry = progressByFile.get(file);
   if (!entry) return;
   const { bar } = entry;
-  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : null;
-  if (!safeDuration) {
+
+  if (!duration) {
     bar.style.width = '0%';
     return;
   }
-  const safeTime = Number.isFinite(currentTime) && currentTime > 0 ? currentTime : 0;
-  const percent = Math.min(100, (safeTime / safeDuration) * 100);
+
+  const safeTime = Number.isFinite(currentTime) && currentTime >= 0 ? currentTime : 0;
+  const percent = Math.min(100, (safeTime / duration) * 100);
   bar.style.width = `${percent}%`;
 }
 
@@ -126,7 +133,7 @@ function resetProgress(file) {
 }
 
 function bindProgress(audio, file) {
-  const update = () => updateProgress(file, audio.currentTime, getSafeDuration(audio));
+  const update = () => updateProgress(file, audio.currentTime, getDuration(audio));
   audio.addEventListener('timeupdate', update);
   audio.addEventListener('loadedmetadata', update);
   audio.addEventListener('seeking', update);
@@ -142,22 +149,17 @@ function stopProgressLoop() {
   progressAudio = null;
 }
 
-function getSafeDuration(audio) {
-  if (!audio) return null;
-  const duration = audio.duration;
-  if (Number.isFinite(duration) && duration > 0) return duration;
-  return null;
-}
-
 function startProgressLoop(audio, file) {
   stopProgressLoop();
   if (!audio) return;
   progressAudio = audio;
+
   const tick = () => {
     if (!progressAudio || progressAudio.paused) return;
-    updateProgress(file, progressAudio.currentTime, getSafeDuration(progressAudio));
+    updateProgress(file, progressAudio.currentTime, getDuration(progressAudio));
     progressRaf = requestAnimationFrame(tick);
   };
+
   tick();
 }
 
@@ -431,6 +433,9 @@ function fadeOutAndStop(audio, durationSeconds, curve, file) {
 function createAudio(file) {
   const encoded = encodeURIComponent(file);
   const audio = new Audio(`/audio/${encoded}`);
+  audio.preload = 'metadata';
+  audio.load();
+
   audio.addEventListener('ended', () => {
     if (currentFile === file) {
       setStatus(`Воспроизведение завершено: ${file}`);
@@ -441,6 +446,18 @@ function createAudio(file) {
     stopProgressLoop();
     resetProgress(file);
   });
+
+  audio.addEventListener('error', () => {
+    setStatus(`Ошибка воспроизведения: ${file}`);
+    setButtonPlaying(file, false);
+    stopProgressLoop();
+    resetProgress(file);
+    if (currentFile === file) {
+      currentAudio = null;
+      currentFile = null;
+    }
+  });
+
   bindProgress(audio, file);
   return audio;
 }
@@ -502,6 +519,7 @@ async function handlePlay(file, button) {
 
   try {
     await audio.play();
+
     if (currentAudio && !currentAudio.paused && overlaySeconds > 0) {
       const oldFile = currentFile;
       setButtonPlaying(file, true);
@@ -524,6 +542,9 @@ async function handlePlay(file, button) {
   } catch (err) {
     console.error(err);
     setStatus('Не удалось начать воспроизведение.');
+    setButtonPlaying(file, false);
+    stopProgressLoop();
+    resetProgress(file);
   } finally {
     button.disabled = false;
   }
@@ -578,7 +599,6 @@ async function stopServer() {
       throw new Error('Request failed');
     }
     setStatus('Сервер останавливается. Окно будет закрыто.');
-    // Попытка закрыть вкладку/окно после успешной остановки
     setTimeout(() => {
       try {
         window.open('', '_self');
