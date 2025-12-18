@@ -159,9 +159,9 @@ function getSafeDuration(audio) {
     if (Number.isFinite(bufferedEnd) && bufferedEnd > 0) candidates.push(bufferedEnd);
   }
   const maxCandidate = candidates.length ? Math.max(...candidates) : 0;
-  if (maxCandidate > 0 || currentTime > 0) {
-    return Math.max(maxCandidate, currentTime) + 30;
-  }
+  if (maxCandidate > currentTime + 1) return maxCandidate;
+  if (maxCandidate > 0) return Math.max(maxCandidate, currentTime + 1);
+  if (currentTime > 0) return currentTime + 3;
   return null;
 }
 
