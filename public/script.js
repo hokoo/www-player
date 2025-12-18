@@ -19,6 +19,10 @@ let currentAudio = null;
 let currentFile = null;
 let fadeCancel = { cancelled: false };
 let buttonsByFile = new Map();
+let cardsByFile = new Map();
+let progressByFile = new Map();
+let progressRaf = null;
+let progressAudio = null;
 const MAX_ZONES = 5;
 let layout = Array.from({ length: MAX_ZONES }, () => []); // array of zones -> array of filenames
 let availableFiles = [];
@@ -83,10 +87,80 @@ function renderEmpty() {
 
 function setButtonPlaying(file, isPlaying) {
   const btn = buttonsByFile.get(file);
-  if (!btn) return;
-  btn.textContent = isPlaying ? '■' : '▶';
-  btn.title = isPlaying ? 'Остановить' : 'Воспроизвести';
-  btn.classList.toggle('is-playing', isPlaying);
+  const card = cardsByFile.get(file);
+  const progress = progressByFile.get(file);
+  if (btn) {
+    btn.textContent = isPlaying ? '■' : '▶';
+    btn.title = isPlaying ? 'Остановить' : 'Воспроизвести';
+  }
+  if (card) {
+    card.classList.toggle('is-playing', isPlaying);
+  }
+  if (progress) {
+    const { container, bar } = progress;
+    container.classList.toggle('visible', isPlaying);
+    if (!isPlaying && bar) {
+      bar.style.width = '0%';
+    }
+  }
+}
+
+// Only trust the real duration reported by the browser.
+function getDuration(audio) {
+  const d = audio ? audio.duration : NaN;
+  return Number.isFinite(d) && d > 0 ? d : null;
+}
+
+function updateProgress(file, currentTime, duration) {
+  const entry = progressByFile.get(file);
+  if (!entry) return;
+  const { bar } = entry;
+
+  if (!duration) {
+    bar.style.width = '0%';
+    return;
+  }
+
+  const safeTime = Number.isFinite(currentTime) && currentTime >= 0 ? currentTime : 0;
+  const percent = Math.min(100, (safeTime / duration) * 100);
+  bar.style.width = `${percent}%`;
+}
+
+function resetProgress(file) {
+  const entry = progressByFile.get(file);
+  if (!entry) return;
+  entry.bar.style.width = '0%';
+}
+
+function bindProgress(audio, file) {
+  const update = () => updateProgress(file, audio.currentTime, getDuration(audio));
+  audio.addEventListener('timeupdate', update);
+  audio.addEventListener('loadedmetadata', update);
+  audio.addEventListener('seeking', update);
+  audio.addEventListener('seeked', update);
+  audio.addEventListener('durationchange', update);
+}
+
+function stopProgressLoop() {
+  if (progressRaf !== null) {
+    cancelAnimationFrame(progressRaf);
+    progressRaf = null;
+  }
+  progressAudio = null;
+}
+
+function startProgressLoop(audio, file) {
+  stopProgressLoop();
+  if (!audio) return;
+  progressAudio = audio;
+
+  const tick = () => {
+    if (!progressAudio || progressAudio.paused) return;
+    updateProgress(file, progressAudio.currentTime, getDuration(progressAudio));
+    progressRaf = requestAnimationFrame(tick);
+  };
+
+  tick();
 }
 
 function buildTrackCard(file) {
@@ -94,6 +168,7 @@ function buildTrackCard(file) {
   card.className = 'track-card';
   card.draggable = true;
   card.dataset.file = file;
+  cardsByFile.set(file, card);
 
   const info = document.createElement('div');
   const name = document.createElement('p');
@@ -110,6 +185,17 @@ function buildTrackCard(file) {
   playButton.title = 'Воспроизвести';
   playButton.addEventListener('click', () => handlePlay(file, playButton));
   buttonsByFile.set(file, playButton);
+
+  const progress = document.createElement('div');
+  progress.className = 'play-progress';
+  const progressBar = document.createElement('div');
+  progressBar.className = 'play-progress__bar';
+  progress.append(progressBar);
+  progressByFile.set(file, { container: progress, bar: progressBar });
+
+  const playBlock = document.createElement('div');
+  playBlock.className = 'play-block';
+  playBlock.append(playButton, progress);
 
   const volumeWrap = document.createElement('label');
   volumeWrap.className = 'volume';
@@ -144,7 +230,7 @@ function buildTrackCard(file) {
   });
 
   volumeWrap.append(volumeRange);
-  controls.append(playButton, volumeWrap);
+  controls.append(playBlock, volumeWrap);
   card.append(info, controls);
   attachDragHandlers(card);
   return card;
@@ -205,6 +291,8 @@ function saveLayout() {
 function renderZones() {
   zonesContainer.innerHTML = '';
   buttonsByFile = new Map();
+  cardsByFile = new Map();
+  progressByFile = new Map();
   layout = ensureZoneCount(layout);
 
   layout.forEach((zoneFiles, zoneIndex) => {
@@ -306,6 +394,7 @@ function fadeOutAndStop(audio, durationSeconds, curve, file) {
       audio.pause();
       audio.currentTime = 0;
       setButtonPlaying(file, false);
+      stopProgressLoop();
       if (currentFile === file) {
         currentAudio = null;
         currentFile = null;
@@ -328,6 +417,7 @@ function fadeOutAndStop(audio, durationSeconds, curve, file) {
         audio.pause();
         audio.currentTime = 0;
         setButtonPlaying(file, false);
+        stopProgressLoop();
         if (currentFile === file) {
           currentAudio = null;
           currentFile = null;
@@ -343,12 +433,32 @@ function fadeOutAndStop(audio, durationSeconds, curve, file) {
 function createAudio(file) {
   const encoded = encodeURIComponent(file);
   const audio = new Audio(`/audio/${encoded}`);
+  audio.preload = 'metadata';
+  audio.load();
+
   audio.addEventListener('ended', () => {
     if (currentFile === file) {
       setStatus(`Воспроизведение завершено: ${file}`);
-      setButtonPlaying(file, false);
+      currentAudio = null;
+      currentFile = null;
+    }
+    setButtonPlaying(file, false);
+    stopProgressLoop();
+    resetProgress(file);
+  });
+
+  audio.addEventListener('error', () => {
+    setStatus(`Ошибка воспроизведения: ${file}`);
+    setButtonPlaying(file, false);
+    stopProgressLoop();
+    resetProgress(file);
+    if (currentFile === file) {
+      currentAudio = null;
+      currentFile = null;
     }
   });
+
+  bindProgress(audio, file);
   return audio;
 }
 
@@ -380,6 +490,7 @@ function applyOverlay(oldAudio, newAudio, targetVolume, overlaySeconds, curve, n
       currentAudio = newAudio;
       currentFile = newFile;
       setButtonPlaying(newFile, true);
+      startProgressLoop(newAudio, newFile);
       setStatus(`Играет: ${newFile}`);
     }
   }
@@ -408,9 +519,11 @@ async function handlePlay(file, button) {
 
   try {
     await audio.play();
+
     if (currentAudio && !currentAudio.paused && overlaySeconds > 0) {
       const oldFile = currentFile;
       setButtonPlaying(file, true);
+      startProgressLoop(audio, file);
       applyOverlay(currentAudio, audio, targetVolume, overlaySeconds, curve, file, oldFile);
     } else {
       if (currentAudio) {
@@ -423,11 +536,15 @@ async function handlePlay(file, button) {
       currentAudio = audio;
       currentFile = file;
       setButtonPlaying(file, true);
+      startProgressLoop(audio, file);
       setStatus(`Играет: ${file}`);
     }
   } catch (err) {
     console.error(err);
     setStatus('Не удалось начать воспроизведение.');
+    setButtonPlaying(file, false);
+    stopProgressLoop();
+    resetProgress(file);
   } finally {
     button.disabled = false;
   }
@@ -482,7 +599,6 @@ async function stopServer() {
       throw new Error('Request failed');
     }
     setStatus('Сервер останавливается. Окно будет закрыто.');
-    // Попытка закрыть вкладку/окно после успешной остановки
     setTimeout(() => {
       try {
         window.open('', '_self');
