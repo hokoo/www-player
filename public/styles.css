@@ -437,8 +437,28 @@ button.secondary:disabled {
   border-color: var(--border-strong);
   box-shadow: 0 0 18px var(--shadow-accent-strong);
   background: linear-gradient(180deg, rgba(185, 28, 28, 0.08), rgba(0, 0, 0, 0.05));
+  animation: heartbeat 2.6s ease-in-out infinite;
 }
 
 .track-card.is-playing .track-name {
   color: #f8fafc;
+}
+
+@keyframes heartbeat {
+  0% {
+    box-shadow: 0 0 16px var(--shadow-accent);
+    transform: scale(1);
+  }
+  14% {
+    box-shadow: 0 0 24px var(--shadow-accent-strong);
+    transform: scale(1.01);
+  }
+  28% {
+    box-shadow: 0 0 18px var(--shadow-accent);
+    transform: scale(1);
+  }
+  100% {
+    box-shadow: 0 0 16px var(--shadow-accent);
+    transform: scale(1);
+  }
 }
