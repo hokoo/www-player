@@ -558,9 +558,9 @@ async function handlePlay(file, button) {
 }
 
 function initSettings() {
-  overlayTimeInput.value = loadSetting(SETTINGS_KEYS.overlayTime, '1.5');
+  overlayTimeInput.value = loadSetting(SETTINGS_KEYS.overlayTime, '0.3');
   overlayCurveSelect.value = loadSetting(SETTINGS_KEYS.overlayCurve, 'linear');
-  stopFadeInput.value = loadSetting(SETTINGS_KEYS.stopFade, '0.5');
+  stopFadeInput.value = loadSetting(SETTINGS_KEYS.stopFade, '0.4');
 
   overlayTimeInput.addEventListener('change', () => {
     const sanitized = Math.max(0, parseFloat(overlayTimeInput.value) || 0).toString();
