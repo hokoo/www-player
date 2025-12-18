@@ -144,24 +144,8 @@ function stopProgressLoop() {
 
 function getSafeDuration(audio) {
   if (!audio) return null;
-  const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
   const duration = audio.duration;
-  const candidates = [];
-
-  if (Number.isFinite(duration) && duration > currentTime && duration > 0) return duration;
-  if (Number.isFinite(duration) && duration > 0) candidates.push(duration);
-  if (audio.seekable && audio.seekable.length > 0) {
-    const end = audio.seekable.end(audio.seekable.length - 1);
-    if (Number.isFinite(end) && end > 0) candidates.push(end);
-  }
-  if (audio.buffered && audio.buffered.length > 0) {
-    const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
-    if (Number.isFinite(bufferedEnd) && bufferedEnd > 0) candidates.push(bufferedEnd);
-  }
-  const maxCandidate = candidates.length ? Math.max(...candidates) : 0;
-  if (maxCandidate > currentTime + 1) return maxCandidate;
-  if (maxCandidate > 0) return Math.max(maxCandidate, currentTime + 1);
-  if (currentTime > 0) return currentTime + 3;
+  if (Number.isFinite(duration) && duration > 0) return duration;
   return null;
 }
 

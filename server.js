@@ -95,7 +95,62 @@ function handleAudioFile(req, res, pathname) {
       res.end('Not Found');
       return;
     }
-    serveStatic(res, filePath);
+
+    const totalSize = stats.size;
+    const range = req.headers.range;
+    const contentType = getContentType(filePath);
+
+    if (range) {
+      const match = /bytes=(\d*)-(\d*)/.exec(range);
+      if (!match) {
+        res.writeHead(416, {
+          'Content-Range': `bytes */${totalSize}`,
+          'Accept-Ranges': 'bytes',
+        });
+        res.end();
+        return;
+      }
+
+      const start = match[1] ? parseInt(match[1], 10) : 0;
+      const end = match[2] ? parseInt(match[2], 10) : totalSize - 1;
+
+      if (Number.isNaN(start) || Number.isNaN(end) || start >= totalSize || end >= totalSize || start > end) {
+        res.writeHead(416, {
+          'Content-Range': `bytes */${totalSize}`,
+          'Accept-Ranges': 'bytes',
+        });
+        res.end();
+        return;
+      }
+
+      const chunkSize = end - start + 1;
+      res.writeHead(206, {
+        'Content-Range': `bytes ${start}-${end}/${totalSize}`,
+        'Accept-Ranges': 'bytes',
+        'Content-Length': chunkSize,
+        'Content-Type': contentType,
+      });
+
+      const stream = fs.createReadStream(filePath, { start, end });
+      stream.on('error', () => {
+        res.writeHead(500);
+        res.end('Internal Server Error');
+      });
+      stream.pipe(res);
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Length': totalSize,
+      'Content-Type': contentType,
+      'Accept-Ranges': 'bytes',
+    });
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', () => {
+      res.writeHead(500);
+      res.end('Internal Server Error');
+    });
+    stream.pipe(res);
   });
 }
 
