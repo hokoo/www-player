@@ -211,7 +211,7 @@ body {
 
 button.play {
   background: transparent;
-  color: var(--text);
+  color: var(--border);
   border: none;
   padding: 0 14px;
   border-radius: 10px;
@@ -311,6 +311,11 @@ button.danger {
   width: 0;
   background: linear-gradient(90deg, var(--primary), var(--shadow-accent-strong));
   transition: width 0.08s linear;
+}
+
+.track-card.is-playing button.play {
+  color: var(--text);
+  font-size: 22px;
 }
 
 .volume input[type='range'] {
