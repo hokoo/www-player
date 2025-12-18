@@ -146,6 +146,13 @@ function getSafeDuration(audio) {
     const end = audio.seekable.end(audio.seekable.length - 1);
     if (Number.isFinite(end) && end > 0) return end;
   }
+  if (audio.buffered && audio.buffered.length > 0) {
+    const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
+    if (Number.isFinite(bufferedEnd) && bufferedEnd > 0) return bufferedEnd;
+  }
+  if (Number.isFinite(audio.currentTime) && audio.currentTime > 0) {
+    return audio.currentTime + 1;
+  }
   return 0;
 }
 
