@@ -109,9 +109,13 @@ function updateProgress(file, currentTime, duration) {
   const entry = progressByFile.get(file);
   if (!entry) return;
   const { bar } = entry;
-  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : null;
+  if (!safeDuration) {
+    bar.style.width = '0%';
+    return;
+  }
   const safeTime = Number.isFinite(currentTime) && currentTime > 0 ? currentTime : 0;
-  const percent = safeDuration > 0 ? Math.min(100, (safeTime / safeDuration) * 100) : 0;
+  const percent = Math.min(100, (safeTime / safeDuration) * 100);
   bar.style.width = `${percent}%`;
 }
 
@@ -139,21 +143,19 @@ function stopProgressLoop() {
 }
 
 function getSafeDuration(audio) {
-  if (!audio) return 0;
+  if (!audio) return null;
+  const currentTime = Number.isFinite(audio.currentTime) ? audio.currentTime : 0;
   const duration = audio.duration;
-  if (Number.isFinite(duration) && duration > 0) return duration;
+  if (Number.isFinite(duration) && duration > currentTime && duration > 0) return duration;
   if (audio.seekable && audio.seekable.length > 0) {
     const end = audio.seekable.end(audio.seekable.length - 1);
-    if (Number.isFinite(end) && end > 0) return end;
+    if (Number.isFinite(end) && end > currentTime) return end;
   }
   if (audio.buffered && audio.buffered.length > 0) {
     const bufferedEnd = audio.buffered.end(audio.buffered.length - 1);
-    if (Number.isFinite(bufferedEnd) && bufferedEnd > 0) return bufferedEnd;
+    if (Number.isFinite(bufferedEnd) && bufferedEnd > currentTime) return bufferedEnd;
   }
-  if (Number.isFinite(audio.currentTime) && audio.currentTime > 0) {
-    return audio.currentTime + 1;
-  }
-  return 0;
+  return null;
 }
 
 function startProgressLoop(audio, file) {
