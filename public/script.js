@@ -223,6 +223,10 @@ function renderZones() {
     zone.append(body);
     zonesContainer.appendChild(zone);
   });
+
+  if (currentFile) {
+    setButtonPlaying(currentFile, !!(currentAudio && !currentAudio.paused));
+  }
 }
 
 function handleDrop(event, targetZoneIndex) {
