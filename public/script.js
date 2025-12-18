@@ -50,7 +50,7 @@ const easing = (t, type) => {
 };
 
 function setStatus(message) {
-  statusEl.textContent = message;
+  if (statusEl) statusEl.textContent = message;
 }
 
 function loadSetting(key, fallback) {
