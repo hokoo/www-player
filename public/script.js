@@ -388,6 +388,13 @@ function resetFadeState() {
 
 function fadeOutAndStop(audio, durationSeconds, curve, file) {
   return new Promise((resolve) => {
+    let settled = false;
+    const safeResolve = () => {
+      if (settled) return;
+      settled = true;
+      resolve();
+    };
+
     if (!audio) return resolve();
     const duration = Math.max(0, durationSeconds || 0) * 1000;
     if (duration === 0) {
@@ -399,7 +406,7 @@ function fadeOutAndStop(audio, durationSeconds, curve, file) {
         currentAudio = null;
         currentFile = null;
       }
-      return resolve();
+      return safeResolve();
     }
     resetFadeState();
     const token = fadeCancel;
@@ -407,7 +414,7 @@ function fadeOutAndStop(audio, durationSeconds, curve, file) {
     const startVolume = clampVolume(audio.volume);
 
     function step(now) {
-      if (token.cancelled) return;
+      if (token.cancelled) return safeResolve();
       const progress = Math.min((now - start) / duration, 1);
       const eased = easing(progress, curve);
       audio.volume = clampVolume(startVolume * (1 - eased));
@@ -422,7 +429,7 @@ function fadeOutAndStop(audio, durationSeconds, curve, file) {
           currentAudio = null;
           currentFile = null;
         }
-        resolve();
+        safeResolve();
       }
     }
 
