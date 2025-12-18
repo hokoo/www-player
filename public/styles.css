@@ -355,6 +355,11 @@ button.danger {
   border: 1px solid var(--border);
   border-radius: 999px;
 }
+
+.track-card input:focus,
+.track-card input:focus-visible {
+  outline: none;
+}
 .empty-state {
   text-align: center;
   padding: 24px;
