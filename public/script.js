@@ -19,6 +19,8 @@ let currentAudio = null;
 let currentFile = null;
 let fadeCancel = { cancelled: false };
 let buttonsByFile = new Map();
+let cardsByFile = new Map();
+let progressByFile = new Map();
 const MAX_ZONES = 5;
 let layout = Array.from({ length: MAX_ZONES }, () => []); // array of zones -> array of filenames
 let availableFiles = [];
@@ -83,10 +85,47 @@ function renderEmpty() {
 
 function setButtonPlaying(file, isPlaying) {
   const btn = buttonsByFile.get(file);
-  if (!btn) return;
-  btn.textContent = isPlaying ? '■' : '▶';
-  btn.title = isPlaying ? 'Остановить' : 'Воспроизвести';
-  btn.classList.toggle('is-playing', isPlaying);
+  const card = cardsByFile.get(file);
+  const progress = progressByFile.get(file);
+  if (btn) {
+    btn.textContent = isPlaying ? '■' : '▶';
+    btn.title = isPlaying ? 'Остановить' : 'Воспроизвести';
+  }
+  if (card) {
+    card.classList.toggle('is-playing', isPlaying);
+  }
+  if (progress) {
+    const { container, bar } = progress;
+    container.classList.toggle('visible', isPlaying);
+    if (!isPlaying && bar) {
+      bar.style.width = '0%';
+    }
+  }
+}
+
+function updateProgress(file, currentTime, duration) {
+  const entry = progressByFile.get(file);
+  if (!entry) return;
+  const { bar } = entry;
+  const safeDuration = Number.isFinite(duration) && duration > 0 ? duration : 0;
+  const safeTime = Number.isFinite(currentTime) && currentTime > 0 ? currentTime : 0;
+  const percent = safeDuration > 0 ? Math.min(100, (safeTime / safeDuration) * 100) : 0;
+  bar.style.width = `${percent}%`;
+}
+
+function resetProgress(file) {
+  const entry = progressByFile.get(file);
+  if (!entry) return;
+  entry.bar.style.width = '0%';
+}
+
+function bindProgress(audio, file) {
+  const update = () => updateProgress(file, audio.currentTime, audio.duration);
+  audio.addEventListener('timeupdate', update);
+  audio.addEventListener('loadedmetadata', update);
+  audio.addEventListener('seeking', update);
+  audio.addEventListener('seeked', update);
+  audio.addEventListener('durationchange', update);
 }
 
 function buildTrackCard(file) {
@@ -94,6 +133,7 @@ function buildTrackCard(file) {
   card.className = 'track-card';
   card.draggable = true;
   card.dataset.file = file;
+  cardsByFile.set(file, card);
 
   const info = document.createElement('div');
   const name = document.createElement('p');
@@ -110,6 +150,17 @@ function buildTrackCard(file) {
   playButton.title = 'Воспроизвести';
   playButton.addEventListener('click', () => handlePlay(file, playButton));
   buttonsByFile.set(file, playButton);
+
+  const progress = document.createElement('div');
+  progress.className = 'play-progress';
+  const progressBar = document.createElement('div');
+  progressBar.className = 'play-progress__bar';
+  progress.append(progressBar);
+  progressByFile.set(file, { container: progress, bar: progressBar });
+
+  const playBlock = document.createElement('div');
+  playBlock.className = 'play-block';
+  playBlock.append(playButton, progress);
 
   const volumeWrap = document.createElement('label');
   volumeWrap.className = 'volume';
@@ -144,7 +195,7 @@ function buildTrackCard(file) {
   });
 
   volumeWrap.append(volumeRange);
-  controls.append(playButton, volumeWrap);
+  controls.append(playBlock, volumeWrap);
   card.append(info, controls);
   attachDragHandlers(card);
   return card;
@@ -205,6 +256,8 @@ function saveLayout() {
 function renderZones() {
   zonesContainer.innerHTML = '';
   buttonsByFile = new Map();
+  cardsByFile = new Map();
+  progressByFile = new Map();
   layout = ensureZoneCount(layout);
 
   layout.forEach((zoneFiles, zoneIndex) => {
@@ -346,9 +399,13 @@ function createAudio(file) {
   audio.addEventListener('ended', () => {
     if (currentFile === file) {
       setStatus(`Воспроизведение завершено: ${file}`);
-      setButtonPlaying(file, false);
+      currentAudio = null;
+      currentFile = null;
     }
+    setButtonPlaying(file, false);
+    resetProgress(file);
   });
+  bindProgress(audio, file);
   return audio;
 }
 

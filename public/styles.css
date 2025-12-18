@@ -196,10 +196,17 @@ body {
 
 .controls {
   display: flex;
-  align-items: center;
+  flex-direction: column;
+  align-items: stretch;
   gap: 10px;
-  flex-wrap: wrap;
   margin-top: auto;
+}
+
+.play-block {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
 }
 
 button.play {
@@ -227,12 +234,6 @@ button.play:disabled {
   opacity: 0.6;
   cursor: not-allowed;
   box-shadow: none;
-}
-
-.play.is-playing {
-  background: var(--primary);
-  color: #fff;
-  box-shadow: 0 0 14px var(--shadow-accent-strong);
 }
 
 button.secondary {
@@ -285,6 +286,27 @@ button.danger {
   gap: 8px;
   min-width: 220px;
   width: 100%;
+}
+
+.play-progress {
+  height: 8px;
+  border-radius: 999px;
+  background: var(--track);
+  border: 1px solid var(--border);
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.play-progress.visible {
+  opacity: 1;
+}
+
+.play-progress__bar {
+  height: 100%;
+  width: 0;
+  background: linear-gradient(90deg, var(--primary), var(--shadow-accent-strong));
+  transition: width 0.08s linear;
 }
 
 .volume input[type='range'] {
@@ -395,4 +417,14 @@ button.secondary:disabled {
 .sidebar-repo__link:focus-visible {
   color: #fff;
   outline: none;
+}
+
+.track-card.is-playing {
+  border-color: var(--border-strong);
+  box-shadow: 0 0 18px var(--shadow-accent-strong);
+  background: linear-gradient(180deg, rgba(185, 28, 28, 0.08), rgba(0, 0, 0, 0.05));
+}
+
+.track-card.is-playing .track-name {
+  color: #f8fafc;
 }
