@@ -237,12 +237,6 @@ async function copyReleaseContents(sourceDir, targetDir) {
   await fs.promises.cp(sourceDir, targetDir, { recursive: true, force: true });
 }
 
-function scheduleRestart() {
-  const exit = () => process.exit(0);
-  server.close(exit);
-  setTimeout(exit, 1000).unref();
-}
-
 function safeResolve(baseDirResolved, requestPath) {
   // requestPath must be without leading slashes
   const resolved = path.resolve(baseDirResolved, requestPath);
@@ -428,8 +422,7 @@ async function handleUpdateApply(req, res) {
     const extractedRoot = await findExtractedRoot(tempDir);
     await copyReleaseContents(extractedRoot, __dirname);
 
-    sendJson(res, 200, { message: 'Обновление установлено. Сервер будет перезапущен.' });
-    setTimeout(scheduleRestart, 500);
+    sendJson(res, 200, { message: 'Обновление установлено. Приложение будет закрыто.' });
   } catch (err) {
     console.error('Update apply failed', err);
     sendJson(res, 500, { error: 'Не удалось выполнить обновление', details: err.message });

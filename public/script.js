@@ -838,7 +838,15 @@ async function applyUpdate() {
 
     const message = (data && (data.message || data.error)) || 'Обновление выполнено';
     setUpdateStatus(message);
-    setUpdateMessage('Обновление загружено');
+    setUpdateMessage('Обновление загружено, приложение будет закрыто.');
+
+    setTimeout(() => {
+      if (stopServerBtn) {
+        stopServerBtn.click();
+      } else {
+        stopServer();
+      }
+    }, 300);
   } catch (err) {
     console.error('Ошибка при обновлении', err);
     setUpdateStatus(err.message);
