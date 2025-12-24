@@ -8,6 +8,35 @@ const { pipeline } = require('stream');
 const { promisify } = require('util');
 const { version: appVersion } = require('./package.json');
 
+function loadEnvFile() {
+  const envPath = path.join(__dirname, '.env');
+
+  if (!fs.existsSync(envPath)) return;
+
+  const content = fs.readFileSync(envPath, 'utf8');
+  content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .forEach((line) => {
+      if (!line || line.startsWith('#')) return;
+
+      const eqIndex = line.indexOf('=');
+      if (eqIndex === -1) return;
+
+      const key = line.slice(0, eqIndex).trim();
+      let value = line.slice(eqIndex + 1).trim();
+
+      if (key && process.env[key] === undefined) {
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+        process.env[key] = value;
+      }
+    });
+}
+
+loadEnvFile();
+
 const PORT = process.env.PORT || 3000;
 const AUDIO_DIR = path.join(__dirname, 'audio');
 const ASSETS_AUDIO_DIR = path.join(__dirname, 'assets', 'audio');
@@ -17,6 +46,8 @@ const REPO_OWNER = 'hokoo';
 const REPO_NAME = 'www-player';
 const GITHUB_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
 const ONE_HOUR_MS = 60 * 60 * 1000;
+const githubToken = process.env.GITHUB_TOKEN || null;
+const UPDATE_CACHE_WINDOW_MS = githubToken ? 0 : ONE_HOUR_MS;
 
 const execFileAsync = promisify(execFile);
 const pipelineAsync = promisify(pipeline);
@@ -129,6 +160,9 @@ function computeRateLimitDelay(headers, fallbackMs) {
 
 async function fetchGithubJsonWithETag(url, cacheEntry, attempt = 1, backoffMs = 1000) {
   const headers = { 'User-Agent': 'www-player-updater', Accept: 'application/vnd.github+json' };
+  if (githubToken) {
+    headers.Authorization = `Bearer ${githubToken}`;
+  }
   if (cacheEntry && cacheEntry.etag) {
     headers['If-None-Match'] = cacheEntry.etag;
   }
@@ -261,7 +295,7 @@ async function getLatestReleaseInfo(currentVersion, allowPrerelease = false) {
   const cacheEntry = updateCheckCache[cacheKey];
   const now = Date.now();
 
-  if (cacheEntry.result && now - cacheEntry.lastChecked < ONE_HOUR_MS) {
+  if (cacheEntry.result && UPDATE_CACHE_WINDOW_MS > 0 && now - cacheEntry.lastChecked < UPDATE_CACHE_WINDOW_MS) {
     return cacheEntry.result;
   }
 
