@@ -48,6 +48,7 @@ const GITHUB_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`
 const ONE_HOUR_MS = 60 * 60 * 1000;
 const githubToken = process.env.GITHUB_TOKEN || null;
 const UPDATE_CACHE_WINDOW_MS = githubToken ? 0 : ONE_HOUR_MS;
+const UPDATE_STATE_PATH = path.join(__dirname, 'update-state.json');
 
 const execFileAsync = promisify(execFile);
 const pipelineAsync = promisify(pipeline);
@@ -62,9 +63,75 @@ const githubCache = {
   latestRelease: { etag: null, data: null },
   releasesList: { etag: null, data: null },
 };
+function getDefaultUpdateState() {
+  return {
+    stable: { lastChecked: 0, result: null },
+    prerelease: { lastChecked: 0, result: null },
+  };
+}
+
+function sanitizeCachedResult(result) {
+  if (!result || typeof result !== 'object') return null;
+
+  const clean = {
+    latestVersion: typeof result.latestVersion === 'string' ? result.latestVersion : null,
+    tarballUrl: typeof result.tarballUrl === 'string' ? result.tarballUrl : null,
+    htmlUrl: typeof result.htmlUrl === 'string' ? result.htmlUrl : null,
+    isPrerelease: Boolean(result.isPrerelease),
+    releaseName: typeof result.releaseName === 'string' ? result.releaseName : null,
+  };
+
+  if (!clean.latestVersion && !clean.tarballUrl && !clean.htmlUrl && !clean.releaseName) {
+    return null;
+  }
+
+  return clean;
+}
+
+function loadPersistedUpdateState() {
+  try {
+    if (!fs.existsSync(UPDATE_STATE_PATH)) {
+      return getDefaultUpdateState();
+    }
+
+    const raw = fs.readFileSync(UPDATE_STATE_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+
+    const state = getDefaultUpdateState();
+
+    ['stable', 'prerelease'].forEach((key) => {
+      if (!parsed[key] || typeof parsed[key] !== 'object') return;
+
+      const lastChecked = Number(parsed[key].lastChecked);
+      if (Number.isFinite(lastChecked) && lastChecked > 0) {
+        state[key].lastChecked = lastChecked;
+      }
+
+      const cachedResult = sanitizeCachedResult(parsed[key].result);
+      if (cachedResult) {
+        state[key].result = cachedResult;
+      }
+    });
+
+    return state;
+  } catch (err) {
+    console.error('Failed to load update state cache', err);
+    return getDefaultUpdateState();
+  }
+}
+
+function persistUpdateState(state) {
+  try {
+    fs.writeFileSync(UPDATE_STATE_PATH, JSON.stringify(state, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Failed to persist update state cache', err);
+  }
+}
+
+const persistedUpdateState = loadPersistedUpdateState();
 const updateCheckCache = {
-  stable: { lastChecked: 0, result: null },
-  prerelease: { lastChecked: 0, result: null },
+  stable: { lastChecked: persistedUpdateState.stable.lastChecked, result: persistedUpdateState.stable.result },
+  prerelease: { lastChecked: persistedUpdateState.prerelease.lastChecked, result: persistedUpdateState.prerelease.result },
 };
 
 function delay(ms) {
@@ -327,6 +394,7 @@ async function getLatestReleaseInfo(currentVersion, allowPrerelease = false) {
 
   cacheEntry.lastChecked = now;
   cacheEntry.result = latest;
+  persistUpdateState(updateCheckCache);
 
   return latest;
 }
