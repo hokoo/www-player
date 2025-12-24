@@ -53,6 +53,18 @@
                                    rel="noopener noreferrer">на GitHub</a>
                         </p>
                         <p id="appVersion" class="sidebar-repo__version" aria-live="polite"></p>
+                        <label class="update-settings">
+                                <input type="checkbox" id="allowPrerelease" />
+                                <span>Устанавливать пре-релизные версии</span>
+                        </label>
+                        <div id="updateInfo" class="update-info" hidden>
+                                <p id="updateMessage" class="update-info__message" aria-live="polite"></p>
+                                <div class="update-info__actions">
+                                        <button id="updateButton" class="secondary">Обновить</button>
+                                        <a id="releaseLink" class="sidebar-repo__link" href="#" target="_blank" rel="noopener noreferrer">Релиз</a>
+                                </div>
+                                <p id="updateStatus" class="update-info__status" aria-live="polite"></p>
+                        </div>
                 </section>
         </aside>
 

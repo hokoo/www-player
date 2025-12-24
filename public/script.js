@@ -9,6 +9,12 @@ const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebarToggle');
 const stopServerBtn = document.getElementById('stopServer');
 const appVersionEl = document.getElementById('appVersion');
+const updateInfoEl = document.getElementById('updateInfo');
+const updateMessageEl = document.getElementById('updateMessage');
+const updateButton = document.getElementById('updateButton');
+const updateStatusEl = document.getElementById('updateStatus');
+const releaseLinkEl = document.getElementById('releaseLink');
+const allowPrereleaseInput = document.getElementById('allowPrerelease');
 
 const SETTINGS_KEYS = {
   overlayTime: 'player:overlayTime',
@@ -16,6 +22,7 @@ const SETTINGS_KEYS = {
   layout: 'player:zones',
   stopFade: 'player:stopFade',
   sidebarOpen: 'player:sidebarOpen',
+  allowPrerelease: 'player:allowPrerelease',
 };
 
 let currentAudio = null;
@@ -30,6 +37,7 @@ const MAX_ZONES = 5;
 let layout = Array.from({ length: MAX_ZONES }, () => []); // array of zones -> array of filenames
 let availableFiles = [];
 let assetFiles = [];
+let shutdownCountdownTimer = null;
 
 function clampVolume(value) {
   if (!Number.isFinite(value)) return 0;
@@ -80,6 +88,12 @@ function loadSetting(key, fallback) {
 
 function saveSetting(key, value) {
   localStorage.setItem(key, value);
+}
+
+function loadBooleanSetting(key, fallback = false) {
+  const value = localStorage.getItem(key);
+  if (value === null) return fallback;
+  return value === 'true';
 }
 
 function volumeKey(key) {
@@ -704,6 +718,21 @@ function initServerControls() {
   stopServerBtn.addEventListener('click', stopServer);
 }
 
+function initUpdater() {
+  if (allowPrereleaseInput) {
+    allowPrereleaseInput.checked = loadBooleanSetting(SETTINGS_KEYS.allowPrerelease, false);
+    allowPrereleaseInput.addEventListener('change', () => {
+      saveSetting(SETTINGS_KEYS.allowPrerelease, allowPrereleaseInput.checked ? 'true' : 'false');
+      checkForUpdates();
+    });
+  }
+
+  if (updateButton) {
+    updateButton.addEventListener('click', applyUpdate);
+  }
+  checkForUpdates();
+}
+
 async function loadVersion() {
   if (!appVersionEl) return;
 
@@ -724,8 +753,137 @@ async function loadVersion() {
   }
 }
 
+function showUpdateBlock(isVisible) {
+  if (!updateInfoEl) return;
+  updateInfoEl.hidden = !isVisible;
+}
+
+function resetUpdateUi() {
+  setUpdateMessage('');
+  setUpdateStatus('');
+  setReleaseLink(null);
+  if (updateButton) {
+    updateButton.disabled = true;
+  }
+  showUpdateBlock(false);
+}
+
+function setReleaseLink(url, label = 'Релиз') {
+  if (!releaseLinkEl) return;
+  if (url) {
+    releaseLinkEl.href = url;
+    releaseLinkEl.textContent = label;
+    releaseLinkEl.style.display = 'inline';
+  } else {
+    releaseLinkEl.style.display = 'none';
+  }
+}
+
+function setUpdateMessage(text) {
+  if (!updateMessageEl) return;
+  updateMessageEl.textContent = text;
+}
+
+function setUpdateStatus(text) {
+  if (!updateStatusEl) return;
+  updateStatusEl.textContent = text;
+}
+
+function startShutdownCountdown(seconds = 20) {
+  let remaining = Math.max(0, Math.floor(seconds));
+
+  if (shutdownCountdownTimer) {
+    clearTimeout(shutdownCountdownTimer);
+    shutdownCountdownTimer = null;
+  }
+
+  const tick = () => {
+    if (remaining <= 0) {
+      shutdownCountdownTimer = null;
+      if (stopServerBtn) {
+        stopServerBtn.click();
+      } else {
+        stopServer();
+      }
+      return;
+    }
+
+    setUpdateMessage(`Приложение будет закрыто через ${remaining} с.`);
+    remaining -= 1;
+    shutdownCountdownTimer = setTimeout(tick, 1000);
+  };
+
+  tick();
+}
+
+async function checkForUpdates() {
+  if (!updateInfoEl || !updateMessageEl || !updateButton) return;
+
+  resetUpdateUi();
+
+  const allowPrerelease = allowPrereleaseInput ? allowPrereleaseInput.checked : false;
+
+  try {
+    const res = await fetch(`/api/update/check?allowPrerelease=${allowPrerelease ? 'true' : 'false'}`);
+    if (!res.ok) {
+      throw new Error('Request failed');
+    }
+    const data = await res.json();
+
+    if (data && data.currentVersion && appVersionEl) {
+      appVersionEl.textContent = `Версия: ${data.currentVersion}`;
+    }
+
+    if (data && data.hasUpdate && data.latestVersion) {
+      const releaseLabel = data.releaseName || `v${data.latestVersion}`;
+      setUpdateMessage(`Доступен релиз: ${releaseLabel}`);
+      setReleaseLink(data.releaseUrl || null, releaseLabel);
+      updateButton.disabled = false;
+      showUpdateBlock(true);
+    }
+  } catch (err) {
+    console.error('Не удалось проверить обновления', err);
+    resetUpdateUi();
+  }
+}
+
+async function applyUpdate() {
+  if (!updateButton) return;
+
+  updateButton.disabled = true;
+  setUpdateStatus('Скачиваем и устанавливаем обновление...');
+
+  const allowPrerelease = allowPrereleaseInput ? allowPrereleaseInput.checked : false;
+
+  try {
+    const res = await fetch(`/api/update/apply?allowPrerelease=${allowPrerelease ? 'true' : 'false'}`, { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const message = data && (data.error || data.message);
+      throw new Error(message || 'Не удалось выполнить запрос');
+    }
+
+    const message = (data && (data.message || data.error)) || 'Обновление выполнено';
+    const installed = res.ok && typeof message === 'string' && message.toLowerCase().includes('обновление установлено');
+
+    if (installed) {
+      setUpdateStatus('Обновление установлено.');
+      startShutdownCountdown(20);
+      return;
+    }
+
+    setUpdateStatus(message);
+  } catch (err) {
+    console.error('Ошибка при обновлении', err);
+    setUpdateStatus(err.message);
+    updateButton.disabled = false;
+  }
+}
+
 initSettings();
 initSidebarToggle();
 initServerControls();
+initUpdater();
 loadTracks();
 loadVersion();
