@@ -4,10 +4,12 @@ const fs = require('fs');
 
 const PORT = process.env.PORT || 3000;
 const AUDIO_DIR = path.join(__dirname, 'audio');
+const ASSETS_AUDIO_DIR = path.join(__dirname, 'assets', 'audio');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.flac']);
 
 const AUDIO_DIR_RESOLVED = path.resolve(AUDIO_DIR);
+const ASSETS_AUDIO_DIR_RESOLVED = path.resolve(ASSETS_AUDIO_DIR);
 const PUBLIC_DIR_RESOLVED = path.resolve(PUBLIC_DIR);
 
 let shuttingDown = false;
@@ -145,10 +147,14 @@ function serveAudioWithRange(req, res, filePath, contentType) {
   });
 }
 
-function handleApiAudio(req, res) {
-  fs.readdir(AUDIO_DIR, { withFileTypes: true }, (err, entries) => {
+function readAudioDirectory(directory, res) {
+  fs.readdir(directory, { withFileTypes: true }, (err, entries) => {
     if (err) {
-      sendJson(res, 500, { error: 'Failed to read audio directory' });
+      if (err.code === 'ENOENT') {
+        sendJson(res, 200, { files: [] });
+      } else {
+        sendJson(res, 500, { error: 'Failed to read audio directory' });
+      }
       return;
     }
 
@@ -159,6 +165,14 @@ function handleApiAudio(req, res) {
 
     sendJson(res, 200, { files: audioFiles });
   });
+}
+
+function handleApiAudio(req, res) {
+  readAudioDirectory(AUDIO_DIR, res);
+}
+
+function handleApiAssetsAudio(req, res) {
+  readAudioDirectory(ASSETS_AUDIO_DIR, res);
 }
 
 function handleShutdown(req, res) {
@@ -176,9 +190,10 @@ function handleShutdown(req, res) {
   setTimeout(exit, 1000).unref();
 }
 
-function handleAudioFile(req, res, pathname) {
-  const requested = pathname.replace(/^\/audio\//, '').replace(/^\/+/, '');
-  const filePath = safeResolve(AUDIO_DIR_RESOLVED, requested);
+function handleAudioFile(req, res, pathname, baseResolved, basePrefix) {
+  const prefix = basePrefix.endsWith('/') ? basePrefix : `${basePrefix}/`;
+  const requested = pathname.replace(new RegExp(`^${prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`), '').replace(/^\/+/, '');
+  const filePath = safeResolve(baseResolved, requested);
 
   if (!filePath) {
     res.writeHead(403);
@@ -240,6 +255,16 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  if (pathname === '/api/assets-audio') {
+    if (req.method !== 'GET') {
+      res.writeHead(405);
+      res.end('Method Not Allowed');
+      return;
+    }
+    handleApiAssetsAudio(req, res);
+    return;
+  }
+
   if (pathname.startsWith('/audio/')) {
     // Allow GET and HEAD for proper metadata fetching.
     if (req.method !== 'GET' && req.method !== 'HEAD') {
@@ -247,7 +272,17 @@ const server = http.createServer((req, res) => {
       res.end('Method Not Allowed');
       return;
     }
-    handleAudioFile(req, res, pathname);
+    handleAudioFile(req, res, pathname, AUDIO_DIR_RESOLVED, '/audio/');
+    return;
+  }
+
+  if (pathname.startsWith('/assets/audio/')) {
+    if (req.method !== 'GET' && req.method !== 'HEAD') {
+      res.writeHead(405);
+      res.end('Method Not Allowed');
+      return;
+    }
+    handleAudioFile(req, res, pathname, ASSETS_AUDIO_DIR_RESOLVED, '/assets/audio/');
     return;
   }
 

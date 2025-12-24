@@ -104,6 +104,51 @@ body {
   max-width: 1600px;
 }
 
+.assets-panel {
+  width: 100%;
+  max-width: 1600px;
+}
+
+.assets-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  flex-wrap: wrap;
+}
+
+.assets-title {
+  margin: 0 0 6px;
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.assets-hint {
+  margin: 0;
+  color: var(--muted);
+  font-size: 14px;
+  max-width: 720px;
+}
+
+.assets-status {
+  margin: 4px 0 0;
+}
+
+.assets-tracks {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.assets-empty {
+  width: 100%;
+  text-align: center;
+  color: var(--muted);
+  margin: 12px 0 4px;
+}
+
 .settings {
   display: grid;
   gap: 12px;
