@@ -8,6 +8,35 @@ const { pipeline } = require('stream');
 const { promisify } = require('util');
 const { version: appVersion } = require('./package.json');
 
+function loadEnvFile() {
+  const envPath = path.join(__dirname, '.env');
+
+  if (!fs.existsSync(envPath)) return;
+
+  const content = fs.readFileSync(envPath, 'utf8');
+  content
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .forEach((line) => {
+      if (!line || line.startsWith('#')) return;
+
+      const eqIndex = line.indexOf('=');
+      if (eqIndex === -1) return;
+
+      const key = line.slice(0, eqIndex).trim();
+      let value = line.slice(eqIndex + 1).trim();
+
+      if (key && process.env[key] === undefined) {
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+        process.env[key] = value;
+      }
+    });
+}
+
+loadEnvFile();
+
 const PORT = process.env.PORT || 3000;
 const AUDIO_DIR = path.join(__dirname, 'audio');
 const ASSETS_AUDIO_DIR = path.join(__dirname, 'assets', 'audio');
@@ -16,6 +45,10 @@ const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.flac']);
 const REPO_OWNER = 'hokoo';
 const REPO_NAME = 'www-player';
 const GITHUB_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
+const ONE_HOUR_MS = 60 * 60 * 1000;
+const githubToken = process.env.GITHUB_TOKEN || null;
+const UPDATE_CACHE_WINDOW_MS = githubToken ? 0 : ONE_HOUR_MS;
+const UPDATE_STATE_PATH = path.join(__dirname, 'update-state.json');
 
 const execFileAsync = promisify(execFile);
 const pipelineAsync = promisify(pipeline);
@@ -26,6 +59,84 @@ const PUBLIC_DIR_RESOLVED = path.resolve(PUBLIC_DIR);
 
 let shuttingDown = false;
 let updateInProgress = false;
+const githubCache = {
+  latestRelease: { etag: null, data: null },
+  releasesList: { etag: null, data: null },
+};
+function getDefaultUpdateState() {
+  return {
+    stable: { lastChecked: 0, result: null },
+    prerelease: { lastChecked: 0, result: null },
+  };
+}
+
+function sanitizeCachedResult(result) {
+  if (!result || typeof result !== 'object') return null;
+
+  const clean = {
+    latestVersion: typeof result.latestVersion === 'string' ? result.latestVersion : null,
+    tarballUrl: typeof result.tarballUrl === 'string' ? result.tarballUrl : null,
+    htmlUrl: typeof result.htmlUrl === 'string' ? result.htmlUrl : null,
+    isPrerelease: Boolean(result.isPrerelease),
+    releaseName: typeof result.releaseName === 'string' ? result.releaseName : null,
+  };
+
+  if (!clean.latestVersion && !clean.tarballUrl && !clean.htmlUrl && !clean.releaseName) {
+    return null;
+  }
+
+  return clean;
+}
+
+function loadPersistedUpdateState() {
+  try {
+    if (!fs.existsSync(UPDATE_STATE_PATH)) {
+      return getDefaultUpdateState();
+    }
+
+    const raw = fs.readFileSync(UPDATE_STATE_PATH, 'utf8');
+    const parsed = JSON.parse(raw);
+
+    const state = getDefaultUpdateState();
+
+    ['stable', 'prerelease'].forEach((key) => {
+      if (!parsed[key] || typeof parsed[key] !== 'object') return;
+
+      const lastChecked = Number(parsed[key].lastChecked);
+      if (Number.isFinite(lastChecked) && lastChecked > 0) {
+        state[key].lastChecked = lastChecked;
+      }
+
+      const cachedResult = sanitizeCachedResult(parsed[key].result);
+      if (cachedResult) {
+        state[key].result = cachedResult;
+      }
+    });
+
+    return state;
+  } catch (err) {
+    console.error('Failed to load update state cache', err);
+    return getDefaultUpdateState();
+  }
+}
+
+function persistUpdateState(state) {
+  try {
+    fs.writeFileSync(UPDATE_STATE_PATH, JSON.stringify(state, null, 2), 'utf8');
+  } catch (err) {
+    console.error('Failed to persist update state cache', err);
+  }
+}
+
+const persistedUpdateState = loadPersistedUpdateState();
+const updateCheckCache = {
+  stable: { lastChecked: persistedUpdateState.stable.lastChecked, result: persistedUpdateState.stable.result },
+  prerelease: { lastChecked: persistedUpdateState.prerelease.lastChecked, result: persistedUpdateState.prerelease.result },
+};
+
+function delay(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
 function isAudioFile(filenameOrPath) {
   return AUDIO_EXTENSIONS.has(path.extname(filenameOrPath).toLowerCase());
@@ -92,15 +203,67 @@ function compareVersions(a, b) {
   return 0;
 }
 
-function fetchJson(url) {
-  return new Promise((resolve, reject) => {
-    const request = https.get(
-      url,
-      { headers: { 'User-Agent': 'www-player-updater' } },
-      (res) => {
+function computeRateLimitDelay(headers, fallbackMs) {
+  const retryAfter = headers['retry-after'];
+  if (retryAfter) {
+    const retrySeconds = parseFloat(retryAfter);
+    if (Number.isFinite(retrySeconds) && retrySeconds > 0) {
+      return retrySeconds * 1000;
+    }
+  }
+
+  const remaining = headers['x-ratelimit-remaining'];
+  const reset = headers['x-ratelimit-reset'];
+
+  if (remaining === '0' && reset) {
+    const resetMs = parseInt(reset, 10) * 1000 - Date.now();
+    if (Number.isFinite(resetMs) && resetMs > 0) {
+      return resetMs;
+    }
+  }
+
+  return fallbackMs;
+}
+
+async function fetchGithubJsonWithETag(url, cacheEntry, attempt = 1, backoffMs = 1000) {
+  const headers = { 'User-Agent': 'www-player-updater', Accept: 'application/vnd.github+json' };
+  if (githubToken) {
+    headers.Authorization = `Bearer ${githubToken}`;
+  }
+  if (cacheEntry && cacheEntry.etag) {
+    headers['If-None-Match'] = cacheEntry.etag;
+  }
+
+  const performRequest = () =>
+    new Promise((resolve, reject) => {
+      const request = https.get(url, { headers }, (res) => {
         if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
           res.resume();
-          resolve(fetchJson(res.headers.location));
+          fetchGithubJsonWithETag(res.headers.location, cacheEntry, attempt, backoffMs).then(resolve).catch(reject);
+          return;
+        }
+
+        if (res.statusCode === 304) {
+          res.resume();
+          if (cacheEntry && cacheEntry.data) {
+            resolve({ data: cacheEntry.data, etag: cacheEntry.etag, fromCache: true });
+          } else {
+            reject(new Error('Получен 304 без сохраненных данных'));
+          }
+          return;
+        }
+
+        if (res.statusCode === 403 || res.statusCode === 429) {
+          const waitMs = computeRateLimitDelay(res.headers, backoffMs);
+          res.resume();
+          if (attempt < 3) {
+            delay(waitMs)
+              .then(() => fetchGithubJsonWithETag(url, cacheEntry, attempt + 1, Math.min(backoffMs * 2, 16000)))
+              .then(resolve)
+              .catch(reject);
+            return;
+          }
+          reject(new Error('Превышены лимиты GitHub API, попробуйте позже'));
           return;
         }
 
@@ -115,16 +278,17 @@ function fetchJson(url) {
         res.on('end', () => {
           try {
             const parsed = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
-            resolve(parsed);
+            resolve({ data: parsed, etag: res.headers.etag || null, fromCache: false });
           } catch (err) {
             reject(err);
           }
         });
-      }
-    );
+      });
 
-    request.on('error', reject);
-  });
+      request.on('error', reject);
+    });
+
+  return performRequest();
 }
 
 function downloadFile(url, destination) {
@@ -175,33 +339,50 @@ function parseReleaseVersion(release) {
   return null;
 }
 
+async function fetchLatestRelease() {
+  const result = await fetchGithubJsonWithETag(`${GITHUB_API_URL}/releases/latest`, githubCache.latestRelease);
+  githubCache.latestRelease.etag = result.etag || githubCache.latestRelease.etag;
+  githubCache.latestRelease.data = result.data || githubCache.latestRelease.data;
+  return githubCache.latestRelease.data;
+}
+
 async function fetchLatestPrerelease() {
-  const releases = await fetchJson(`${GITHUB_API_URL}/releases?per_page=20`);
+  const result = await fetchGithubJsonWithETag(`${GITHUB_API_URL}/releases?per_page=20`, githubCache.releasesList);
+  githubCache.releasesList.etag = result.etag || githubCache.releasesList.etag;
+  githubCache.releasesList.data = result.data || githubCache.releasesList.data;
+
+  const releases = result.data;
   if (!Array.isArray(releases)) return null;
 
   return releases.find((rel) => rel && !rel.draft && rel.prerelease) || null;
 }
 
 async function getLatestReleaseInfo(currentVersion, allowPrerelease = false) {
-  const release = await fetchJson(`${GITHUB_API_URL}/releases/latest`);
+  const cacheKey = allowPrerelease ? 'prerelease' : 'stable';
+  const cacheEntry = updateCheckCache[cacheKey];
+  const now = Date.now();
+
+  if (cacheEntry.result && UPDATE_CACHE_WINDOW_MS > 0 && now - cacheEntry.lastChecked < UPDATE_CACHE_WINDOW_MS) {
+    return cacheEntry.result;
+  }
+
+  const release = await fetchLatestRelease();
   const releaseVersion = parseReleaseVersion(release);
 
-  if (releaseVersion && compareVersions(releaseVersion, currentVersion) > 0) {
-    return {
-      latestVersion: releaseVersion,
-      tarballUrl: release && release.tarball_url,
-      htmlUrl: release && release.html_url,
-      isPrerelease: false,
-      releaseName: release && release.name,
-    };
-  }
+  let latest = {
+    latestVersion: releaseVersion,
+    tarballUrl: release && release.tarball_url,
+    htmlUrl: release && release.html_url,
+    isPrerelease: false,
+    releaseName: release && release.name,
+  };
 
   if (allowPrerelease) {
     const prerelease = await fetchLatestPrerelease();
     const prereleaseVersion = parseReleaseVersion(prerelease);
 
     if (prerelease && prereleaseVersion && compareVersions(prereleaseVersion, currentVersion) > 0) {
-      return {
+      latest = {
         latestVersion: prereleaseVersion,
         tarballUrl: prerelease && prerelease.tarball_url,
         htmlUrl: prerelease && prerelease.html_url,
@@ -211,13 +392,11 @@ async function getLatestReleaseInfo(currentVersion, allowPrerelease = false) {
     }
   }
 
-  return {
-    latestVersion: releaseVersion,
-    tarballUrl: release && release.tarball_url,
-    htmlUrl: release && release.html_url,
-    isPrerelease: false,
-    releaseName: release && release.name,
-  };
+  cacheEntry.lastChecked = now;
+  cacheEntry.result = latest;
+  persistUpdateState(updateCheckCache);
+
+  return latest;
 }
 
 async function extractTarball(archivePath, targetDir) {
@@ -235,12 +414,6 @@ async function findExtractedRoot(tempDir) {
 
 async function copyReleaseContents(sourceDir, targetDir) {
   await fs.promises.cp(sourceDir, targetDir, { recursive: true, force: true });
-}
-
-function scheduleRestart() {
-  const exit = () => process.exit(0);
-  server.close(exit);
-  setTimeout(exit, 1000).unref();
 }
 
 function safeResolve(baseDirResolved, requestPath) {
@@ -428,8 +601,7 @@ async function handleUpdateApply(req, res) {
     const extractedRoot = await findExtractedRoot(tempDir);
     await copyReleaseContents(extractedRoot, __dirname);
 
-    sendJson(res, 200, { message: 'Обновление установлено. Сервер будет перезапущен.' });
-    setTimeout(scheduleRestart, 500);
+    sendJson(res, 200, { message: 'Обновление установлено. Приложение будет закрыто.' });
   } catch (err) {
     console.error('Update apply failed', err);
     sendJson(res, 500, { error: 'Не удалось выполнить обновление', details: err.message });
