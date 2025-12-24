@@ -741,6 +741,16 @@ function showUpdateBlock(isVisible) {
   updateInfoEl.hidden = !isVisible;
 }
 
+function resetUpdateUi() {
+  setUpdateMessage('');
+  setUpdateStatus('');
+  setReleaseLink(null);
+  if (updateButton) {
+    updateButton.disabled = true;
+  }
+  showUpdateBlock(false);
+}
+
 function setReleaseLink(url) {
   if (!releaseLinkEl) return;
   if (url) {
@@ -764,10 +774,7 @@ function setUpdateStatus(text) {
 async function checkForUpdates() {
   if (!updateInfoEl || !updateMessageEl || !updateButton) return;
 
-  setUpdateStatus('');
-  setUpdateMessage('Проверяем наличие обновлений...');
-  updateButton.disabled = true;
-  showUpdateBlock(true);
+  resetUpdateUi();
 
   try {
     const res = await fetch('/api/update/check');
@@ -784,16 +791,11 @@ async function checkForUpdates() {
       setUpdateMessage(`Доступна новая версия v${data.latestVersion}`);
       setReleaseLink(data.releaseUrl || null);
       updateButton.disabled = false;
-    } else {
-      setUpdateMessage('Установлена последняя версия приложения');
-      setUpdateStatus('');
-      showUpdateBlock(false);
+      showUpdateBlock(true);
     }
   } catch (err) {
     console.error('Не удалось проверить обновления', err);
-    setUpdateMessage('Не удалось проверить обновления');
-    setUpdateStatus('Попробуйте позже');
-    updateButton.disabled = true;
+    resetUpdateUi();
   }
 }
 
