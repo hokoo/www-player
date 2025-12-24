@@ -9,6 +9,11 @@ const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebarToggle');
 const stopServerBtn = document.getElementById('stopServer');
 const appVersionEl = document.getElementById('appVersion');
+const updateInfoEl = document.getElementById('updateInfo');
+const updateMessageEl = document.getElementById('updateMessage');
+const updateButton = document.getElementById('updateButton');
+const updateStatusEl = document.getElementById('updateStatus');
+const releaseLinkEl = document.getElementById('releaseLink');
 
 const SETTINGS_KEYS = {
   overlayTime: 'player:overlayTime',
@@ -704,6 +709,13 @@ function initServerControls() {
   stopServerBtn.addEventListener('click', stopServer);
 }
 
+function initUpdater() {
+  if (updateButton) {
+    updateButton.addEventListener('click', applyUpdate);
+  }
+  checkForUpdates();
+}
+
 async function loadVersion() {
   if (!appVersionEl) return;
 
@@ -724,8 +736,95 @@ async function loadVersion() {
   }
 }
 
+function showUpdateBlock(isVisible) {
+  if (!updateInfoEl) return;
+  updateInfoEl.hidden = !isVisible;
+}
+
+function setReleaseLink(url) {
+  if (!releaseLinkEl) return;
+  if (url) {
+    releaseLinkEl.href = url;
+    releaseLinkEl.style.display = 'inline';
+  } else {
+    releaseLinkEl.style.display = 'none';
+  }
+}
+
+function setUpdateMessage(text) {
+  if (!updateMessageEl) return;
+  updateMessageEl.textContent = text;
+}
+
+function setUpdateStatus(text) {
+  if (!updateStatusEl) return;
+  updateStatusEl.textContent = text;
+}
+
+async function checkForUpdates() {
+  if (!updateInfoEl || !updateMessageEl || !updateButton) return;
+
+  setUpdateStatus('');
+  setUpdateMessage('Проверяем наличие обновлений...');
+  updateButton.disabled = true;
+  showUpdateBlock(true);
+
+  try {
+    const res = await fetch('/api/update/check');
+    if (!res.ok) {
+      throw new Error('Request failed');
+    }
+    const data = await res.json();
+
+    if (data && data.currentVersion && appVersionEl) {
+      appVersionEl.textContent = `Версия: ${data.currentVersion}`;
+    }
+
+    if (data && data.hasUpdate && data.latestVersion) {
+      setUpdateMessage(`Доступна новая версия v${data.latestVersion}`);
+      setReleaseLink(data.releaseUrl || null);
+      updateButton.disabled = false;
+    } else {
+      setUpdateMessage('Установлена последняя версия приложения');
+      setUpdateStatus('');
+      showUpdateBlock(false);
+    }
+  } catch (err) {
+    console.error('Не удалось проверить обновления', err);
+    setUpdateMessage('Не удалось проверить обновления');
+    setUpdateStatus('Попробуйте позже');
+    updateButton.disabled = true;
+  }
+}
+
+async function applyUpdate() {
+  if (!updateButton) return;
+
+  updateButton.disabled = true;
+  setUpdateStatus('Скачиваем и устанавливаем обновление...');
+
+  try {
+    const res = await fetch('/api/update/apply', { method: 'POST' });
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      const message = data && (data.error || data.message);
+      throw new Error(message || 'Не удалось выполнить запрос');
+    }
+
+    const message = (data && (data.message || data.error)) || 'Обновление выполнено';
+    setUpdateStatus(message);
+    setUpdateMessage('Обновление загружено');
+  } catch (err) {
+    console.error('Ошибка при обновлении', err);
+    setUpdateStatus(err.message);
+    updateButton.disabled = false;
+  }
+}
+
 initSettings();
 initSidebarToggle();
 initServerControls();
+initUpdater();
 loadTracks();
 loadVersion();

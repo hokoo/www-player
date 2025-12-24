@@ -1,6 +1,11 @@
 const http = require('http');
+const https = require('https');
 const path = require('path');
 const fs = require('fs');
+const os = require('os');
+const { execFile } = require('child_process');
+const { pipeline } = require('stream');
+const { promisify } = require('util');
 const { version: appVersion } = require('./package.json');
 
 const PORT = process.env.PORT || 3000;
@@ -8,12 +13,19 @@ const AUDIO_DIR = path.join(__dirname, 'audio');
 const ASSETS_AUDIO_DIR = path.join(__dirname, 'assets', 'audio');
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const AUDIO_EXTENSIONS = new Set(['.mp3', '.wav', '.ogg', '.m4a', '.flac']);
+const REPO_OWNER = 'hokoo';
+const REPO_NAME = 'www-player';
+const GITHUB_API_URL = `https://api.github.com/repos/${REPO_OWNER}/${REPO_NAME}`;
+
+const execFileAsync = promisify(execFile);
+const pipelineAsync = promisify(pipeline);
 
 const AUDIO_DIR_RESOLVED = path.resolve(AUDIO_DIR);
 const ASSETS_AUDIO_DIR_RESOLVED = path.resolve(ASSETS_AUDIO_DIR);
 const PUBLIC_DIR_RESOLVED = path.resolve(PUBLIC_DIR);
 
 let shuttingDown = false;
+let updateInProgress = false;
 
 function isAudioFile(filenameOrPath) {
   return AUDIO_EXTENSIONS.has(path.extname(filenameOrPath).toLowerCase());
@@ -47,6 +59,147 @@ function sendJson(res, statusCode, payload) {
 function isInside(baseResolved, targetResolved) {
   const rel = path.relative(baseResolved, targetResolved);
   return rel && !rel.startsWith('..') && !path.isAbsolute(rel);
+}
+
+function normalizeVersion(version) {
+  if (typeof version !== 'string') return null;
+  return version.replace(/^v/i, '').trim();
+}
+
+function compareVersions(a, b) {
+  const left = normalizeVersion(a);
+  const right = normalizeVersion(b);
+
+  if (!left || !right) return 0;
+
+  const leftParts = left.split('.').map((p) => parseInt(p, 10) || 0);
+  const rightParts = right.split('.').map((p) => parseInt(p, 10) || 0);
+  const maxLen = Math.max(leftParts.length, rightParts.length);
+
+  for (let i = 0; i < maxLen; i += 1) {
+    const l = leftParts[i] || 0;
+    const r = rightParts[i] || 0;
+    if (l > r) return 1;
+    if (l < r) return -1;
+  }
+
+  return 0;
+}
+
+function fetchJson(url) {
+  return new Promise((resolve, reject) => {
+    const request = https.get(
+      url,
+      { headers: { 'User-Agent': 'www-player-updater' } },
+      (res) => {
+        if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+          res.resume();
+          resolve(fetchJson(res.headers.location));
+          return;
+        }
+
+        if (res.statusCode !== 200) {
+          reject(new Error(`GitHub API responded with status ${res.statusCode}`));
+          res.resume();
+          return;
+        }
+
+        const chunks = [];
+        res.on('data', (chunk) => chunks.push(chunk));
+        res.on('end', () => {
+          try {
+            const parsed = JSON.parse(Buffer.concat(chunks).toString('utf-8'));
+            resolve(parsed);
+          } catch (err) {
+            reject(err);
+          }
+        });
+      }
+    );
+
+    request.on('error', reject);
+  });
+}
+
+function downloadFile(url, destination) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(destination);
+
+    const handleResponse = (res) => {
+      if (res.statusCode >= 300 && res.statusCode < 400 && res.headers.location) {
+        res.resume();
+        https.get(res.headers.location, { headers: { 'User-Agent': 'www-player-updater' } }, handleResponse).on(
+          'error',
+          reject
+        );
+        return;
+      }
+
+      if (res.statusCode !== 200) {
+        reject(new Error(`Download failed with status ${res.statusCode}`));
+        res.resume();
+        return;
+      }
+
+      pipelineAsync(res, file)
+        .then(resolve)
+        .catch((err) => {
+          fs.unlink(destination, () => reject(err));
+        });
+    };
+
+    https
+      .get(url, { headers: { 'User-Agent': 'www-player-updater' } }, handleResponse)
+      .on('error', (err) => {
+        fs.unlink(destination, () => reject(err));
+      });
+  });
+}
+
+function parseReleaseVersion(release) {
+  if (!release) return null;
+  const candidates = [release.tag_name, release.name];
+
+  for (const value of candidates) {
+    if (typeof value !== 'string') continue;
+    const match = /v(\d+(?:\.\d+)*)/i.exec(value);
+    if (match) return match[1];
+  }
+
+  return null;
+}
+
+async function getLatestReleaseInfo() {
+  const release = await fetchJson(`${GITHUB_API_URL}/releases/latest`);
+  const latestVersion = parseReleaseVersion(release);
+  return {
+    latestVersion,
+    tarballUrl: release && release.tarball_url,
+    htmlUrl: release && release.html_url,
+  };
+}
+
+async function extractTarball(archivePath, targetDir) {
+  await execFileAsync('tar', ['-xzf', archivePath, '-C', targetDir]);
+}
+
+async function findExtractedRoot(tempDir) {
+  const entries = await fs.promises.readdir(tempDir, { withFileTypes: true });
+  const folder = entries.find((entry) => entry.isDirectory());
+  if (!folder) {
+    throw new Error('Не удалось найти содержимое распакованного архива');
+  }
+  return path.join(tempDir, folder.name);
+}
+
+async function copyReleaseContents(sourceDir, targetDir) {
+  await fs.promises.cp(sourceDir, targetDir, { recursive: true, force: true });
+}
+
+function scheduleRestart() {
+  const exit = () => process.exit(0);
+  server.close(exit);
+  setTimeout(exit, 1000).unref();
 }
 
 function safeResolve(baseDirResolved, requestPath) {
@@ -180,6 +333,64 @@ function handleApiVersion(req, res) {
   sendJson(res, 200, { version: appVersion });
 }
 
+async function handleUpdateCheck(req, res) {
+  try {
+    const { latestVersion, htmlUrl } = await getLatestReleaseInfo();
+    const comparableLatest = latestVersion || null;
+    const hasUpdate = comparableLatest ? compareVersions(comparableLatest, appVersion) > 0 : false;
+
+    sendJson(res, 200, {
+      currentVersion: appVersion,
+      latestVersion: comparableLatest,
+      hasUpdate,
+      releaseUrl: htmlUrl || null,
+    });
+  } catch (err) {
+    console.error('Update check failed', err);
+    sendJson(res, 500, { error: 'Не удалось проверить наличие обновлений', details: err.message });
+  }
+}
+
+async function handleUpdateApply(req, res) {
+  if (updateInProgress) {
+    sendJson(res, 409, { message: 'Обновление уже выполняется' });
+    return;
+  }
+
+  updateInProgress = true;
+
+  try {
+    const { latestVersion, tarballUrl } = await getLatestReleaseInfo();
+    const comparableLatest = latestVersion || null;
+    const hasUpdate = comparableLatest ? compareVersions(comparableLatest, appVersion) > 0 : false;
+
+    if (!hasUpdate) {
+      sendJson(res, 200, { message: 'Установлена последняя версия приложения' });
+      return;
+    }
+
+    if (!tarballUrl) {
+      throw new Error('Не удалось найти архив релиза для загрузки');
+    }
+
+    const tempDir = await fs.promises.mkdtemp(path.join(os.tmpdir(), 'www-player-update-'));
+    const archivePath = path.join(tempDir, 'release.tar.gz');
+
+    await downloadFile(tarballUrl, archivePath);
+    await extractTarball(archivePath, tempDir);
+    const extractedRoot = await findExtractedRoot(tempDir);
+    await copyReleaseContents(extractedRoot, __dirname);
+
+    sendJson(res, 200, { message: 'Обновление установлено. Сервер будет перезапущен.' });
+    setTimeout(scheduleRestart, 500);
+  } catch (err) {
+    console.error('Update apply failed', err);
+    sendJson(res, 500, { error: 'Не удалось выполнить обновление', details: err.message });
+  } finally {
+    updateInProgress = false;
+  }
+}
+
 function handleShutdown(req, res) {
   if (shuttingDown) {
     sendJson(res, 409, { message: 'Server is already stopping' });
@@ -277,6 +488,26 @@ const server = http.createServer((req, res) => {
       return;
     }
     handleApiVersion(req, res);
+    return;
+  }
+
+  if (pathname === '/api/update/check') {
+    if (req.method !== 'GET') {
+      res.writeHead(405);
+      res.end('Method Not Allowed');
+      return;
+    }
+    handleUpdateCheck(req, res);
+    return;
+  }
+
+  if (pathname === '/api/update/apply') {
+    if (req.method !== 'POST') {
+      res.writeHead(405);
+      res.end('Method Not Allowed');
+      return;
+    }
+    handleUpdateApply(req, res);
     return;
   }
 
