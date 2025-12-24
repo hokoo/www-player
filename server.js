@@ -169,13 +169,43 @@ function parseReleaseVersion(release) {
   return null;
 }
 
-async function getLatestReleaseInfo() {
+async function fetchLatestPrerelease() {
+  const releases = await fetchJson(`${GITHUB_API_URL}/releases?per_page=20`);
+  if (!Array.isArray(releases)) return null;
+
+  return releases.find((rel) => rel && !rel.draft && rel.prerelease) || null;
+}
+
+async function getLatestReleaseInfo(currentVersion) {
   const release = await fetchJson(`${GITHUB_API_URL}/releases/latest`);
-  const latestVersion = parseReleaseVersion(release);
+  const releaseVersion = parseReleaseVersion(release);
+
+  if (releaseVersion && compareVersions(releaseVersion, currentVersion) > 0) {
+    return {
+      latestVersion: releaseVersion,
+      tarballUrl: release && release.tarball_url,
+      htmlUrl: release && release.html_url,
+      isPrerelease: false,
+    };
+  }
+
+  const prerelease = await fetchLatestPrerelease();
+  const prereleaseVersion = parseReleaseVersion(prerelease);
+
+  if (prerelease && prereleaseVersion && compareVersions(prereleaseVersion, currentVersion) > 0) {
+    return {
+      latestVersion: prereleaseVersion,
+      tarballUrl: prerelease && prerelease.tarball_url,
+      htmlUrl: prerelease && prerelease.html_url,
+      isPrerelease: true,
+    };
+  }
+
   return {
-    latestVersion,
+    latestVersion: releaseVersion,
     tarballUrl: release && release.tarball_url,
     htmlUrl: release && release.html_url,
+    isPrerelease: false,
   };
 }
 
@@ -335,7 +365,7 @@ function handleApiVersion(req, res) {
 
 async function handleUpdateCheck(req, res) {
   try {
-    const { latestVersion, htmlUrl } = await getLatestReleaseInfo();
+    const { latestVersion, htmlUrl, isPrerelease } = await getLatestReleaseInfo(appVersion);
     const comparableLatest = latestVersion || null;
     const hasUpdate = comparableLatest ? compareVersions(comparableLatest, appVersion) > 0 : false;
 
@@ -344,6 +374,7 @@ async function handleUpdateCheck(req, res) {
       latestVersion: comparableLatest,
       hasUpdate,
       releaseUrl: htmlUrl || null,
+      isPrerelease: Boolean(isPrerelease),
     });
   } catch (err) {
     console.error('Update check failed', err);
@@ -360,7 +391,7 @@ async function handleUpdateApply(req, res) {
   updateInProgress = true;
 
   try {
-    const { latestVersion, tarballUrl } = await getLatestReleaseInfo();
+    const { latestVersion, tarballUrl } = await getLatestReleaseInfo(appVersion);
     const comparableLatest = latestVersion || null;
     const hasUpdate = comparableLatest ? compareVersions(comparableLatest, appVersion) > 0 : false;
 
