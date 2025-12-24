@@ -460,6 +460,12 @@ button.secondary:disabled {
   outline: none;
 }
 
+.sidebar-repo__version {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .track-card.is-playing {
   border-color: var(--border-strong);
   box-shadow: 0 0 18px var(--shadow-accent-strong);
