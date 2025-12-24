@@ -107,31 +107,13 @@ body {
 .assets-panel {
   width: 100%;
   max-width: 1600px;
-}
-
-.assets-header {
-  display: flex;
-  justify-content: space-between;
-  gap: 16px;
-  align-items: flex-start;
-  flex-wrap: wrap;
-}
-
-.assets-title {
-  margin: 0 0 6px;
-  font-weight: 700;
-  font-size: 16px;
-}
-
-.assets-hint {
-  margin: 0;
-  color: var(--muted);
-  font-size: 14px;
-  max-width: 720px;
+  margin: 0 auto;
+  padding: 0;
 }
 
 .assets-status {
-  margin: 4px 0 0;
+  margin: 0 0 10px;
+  text-align: center;
 }
 
 .assets-tracks {
