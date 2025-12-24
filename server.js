@@ -66,6 +66,12 @@ function normalizeVersion(version) {
   return version.replace(/^v/i, '').trim();
 }
 
+function parseBooleanParam(url, name) {
+  const value = url.searchParams.get(name);
+  if (value === null) return false;
+  return ['1', 'true', 'yes', 'on'].includes(value.toLowerCase());
+}
+
 function compareVersions(a, b) {
   const left = normalizeVersion(a);
   const right = normalizeVersion(b);
@@ -176,7 +182,7 @@ async function fetchLatestPrerelease() {
   return releases.find((rel) => rel && !rel.draft && rel.prerelease) || null;
 }
 
-async function getLatestReleaseInfo(currentVersion) {
+async function getLatestReleaseInfo(currentVersion, allowPrerelease = false) {
   const release = await fetchJson(`${GITHUB_API_URL}/releases/latest`);
   const releaseVersion = parseReleaseVersion(release);
 
@@ -190,17 +196,19 @@ async function getLatestReleaseInfo(currentVersion) {
     };
   }
 
-  const prerelease = await fetchLatestPrerelease();
-  const prereleaseVersion = parseReleaseVersion(prerelease);
+  if (allowPrerelease) {
+    const prerelease = await fetchLatestPrerelease();
+    const prereleaseVersion = parseReleaseVersion(prerelease);
 
-  if (prerelease && prereleaseVersion && compareVersions(prereleaseVersion, currentVersion) > 0) {
-    return {
-      latestVersion: prereleaseVersion,
-      tarballUrl: prerelease && prerelease.tarball_url,
-      htmlUrl: prerelease && prerelease.html_url,
-      isPrerelease: true,
-      releaseName: prerelease && prerelease.name,
-    };
+    if (prerelease && prereleaseVersion && compareVersions(prereleaseVersion, currentVersion) > 0) {
+      return {
+        latestVersion: prereleaseVersion,
+        tarballUrl: prerelease && prerelease.tarball_url,
+        htmlUrl: prerelease && prerelease.html_url,
+        isPrerelease: true,
+        releaseName: prerelease && prerelease.name,
+      };
+    }
   }
 
   return {
@@ -368,7 +376,9 @@ function handleApiVersion(req, res) {
 
 async function handleUpdateCheck(req, res) {
   try {
-    const { latestVersion, htmlUrl, isPrerelease, releaseName } = await getLatestReleaseInfo(appVersion);
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const allowPrerelease = parseBooleanParam(url, 'allowPrerelease');
+    const { latestVersion, htmlUrl, isPrerelease, releaseName } = await getLatestReleaseInfo(appVersion, allowPrerelease);
     const comparableLatest = latestVersion || null;
     const hasUpdate = comparableLatest ? compareVersions(comparableLatest, appVersion) > 0 : false;
 
@@ -395,7 +405,9 @@ async function handleUpdateApply(req, res) {
   updateInProgress = true;
 
   try {
-    const { latestVersion, tarballUrl } = await getLatestReleaseInfo(appVersion);
+    const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
+    const allowPrerelease = parseBooleanParam(url, 'allowPrerelease');
+    const { latestVersion, tarballUrl } = await getLatestReleaseInfo(appVersion, allowPrerelease);
     const comparableLatest = latestVersion || null;
     const hasUpdate = comparableLatest ? compareVersions(comparableLatest, appVersion) > 0 : false;
 

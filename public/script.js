@@ -14,6 +14,7 @@ const updateMessageEl = document.getElementById('updateMessage');
 const updateButton = document.getElementById('updateButton');
 const updateStatusEl = document.getElementById('updateStatus');
 const releaseLinkEl = document.getElementById('releaseLink');
+const allowPrereleaseInput = document.getElementById('allowPrerelease');
 
 const SETTINGS_KEYS = {
   overlayTime: 'player:overlayTime',
@@ -21,6 +22,7 @@ const SETTINGS_KEYS = {
   layout: 'player:zones',
   stopFade: 'player:stopFade',
   sidebarOpen: 'player:sidebarOpen',
+  allowPrerelease: 'player:allowPrerelease',
 };
 
 let currentAudio = null;
@@ -85,6 +87,12 @@ function loadSetting(key, fallback) {
 
 function saveSetting(key, value) {
   localStorage.setItem(key, value);
+}
+
+function loadBooleanSetting(key, fallback = false) {
+  const value = localStorage.getItem(key);
+  if (value === null) return fallback;
+  return value === 'true';
 }
 
 function volumeKey(key) {
@@ -710,6 +718,14 @@ function initServerControls() {
 }
 
 function initUpdater() {
+  if (allowPrereleaseInput) {
+    allowPrereleaseInput.checked = loadBooleanSetting(SETTINGS_KEYS.allowPrerelease, false);
+    allowPrereleaseInput.addEventListener('change', () => {
+      saveSetting(SETTINGS_KEYS.allowPrerelease, allowPrereleaseInput.checked ? 'true' : 'false');
+      checkForUpdates();
+    });
+  }
+
   if (updateButton) {
     updateButton.addEventListener('click', applyUpdate);
   }
@@ -777,8 +793,10 @@ async function checkForUpdates() {
 
   resetUpdateUi();
 
+  const allowPrerelease = allowPrereleaseInput ? allowPrereleaseInput.checked : false;
+
   try {
-    const res = await fetch('/api/update/check');
+    const res = await fetch(`/api/update/check?allowPrerelease=${allowPrerelease ? 'true' : 'false'}`);
     if (!res.ok) {
       throw new Error('Request failed');
     }
@@ -807,8 +825,10 @@ async function applyUpdate() {
   updateButton.disabled = true;
   setUpdateStatus('Скачиваем и устанавливаем обновление...');
 
+  const allowPrerelease = allowPrereleaseInput ? allowPrereleaseInput.checked : false;
+
   try {
-    const res = await fetch('/api/update/apply', { method: 'POST' });
+    const res = await fetch(`/api/update/apply?allowPrerelease=${allowPrerelease ? 'true' : 'false'}`, { method: 'POST' });
     const data = await res.json().catch(() => ({}));
 
     if (!res.ok) {

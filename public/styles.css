@@ -466,6 +466,19 @@ button.secondary:disabled {
   font-size: 12px;
 }
 
+.update-settings {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 8px 0 6px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.update-settings input {
+  width: auto;
+}
+
 .update-info {
   margin-top: 10px;
   padding: 10px;
