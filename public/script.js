@@ -865,8 +865,15 @@ async function applyUpdate() {
     }
 
     const message = (data && (data.message || data.error)) || 'Обновление выполнено';
+    const installed = res.ok && typeof message === 'string' && message.toLowerCase().includes('обновление установлено');
+
+    if (installed) {
+      setUpdateStatus('Обновление установлено.');
+      startShutdownCountdown(20);
+      return;
+    }
+
     setUpdateStatus(message);
-    startShutdownCountdown(20);
   } catch (err) {
     console.error('Ошибка при обновлении', err);
     setUpdateStatus(err.message);
