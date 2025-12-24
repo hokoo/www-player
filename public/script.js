@@ -808,7 +808,7 @@ function startShutdownCountdown(seconds = 20) {
       return;
     }
 
-    setUpdateMessage(`Обновление загружено, приложение будет закрыто через ${remaining} с.`);
+    setUpdateMessage(`Приложение будет закрыто через ${remaining} с.`);
     remaining -= 1;
     shutdownCountdownTimer = setTimeout(tick, 1000);
   };
