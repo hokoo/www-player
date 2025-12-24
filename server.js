@@ -1,6 +1,7 @@
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
+const { version: appVersion } = require('./package.json');
 
 const PORT = process.env.PORT || 3000;
 const AUDIO_DIR = path.join(__dirname, 'audio');
@@ -175,6 +176,10 @@ function handleApiAssetsAudio(req, res) {
   readAudioDirectory(ASSETS_AUDIO_DIR, res);
 }
 
+function handleApiVersion(req, res) {
+  sendJson(res, 200, { version: appVersion });
+}
+
 function handleShutdown(req, res) {
   if (shuttingDown) {
     sendJson(res, 409, { message: 'Server is already stopping' });
@@ -262,6 +267,16 @@ const server = http.createServer((req, res) => {
       return;
     }
     handleApiAssetsAudio(req, res);
+    return;
+  }
+
+  if (pathname === '/api/version') {
+    if (req.method !== 'GET') {
+      res.writeHead(405);
+      res.end('Method Not Allowed');
+      return;
+    }
+    handleApiVersion(req, res);
     return;
   }
 

@@ -8,6 +8,7 @@ const stopFadeInput = document.getElementById('stopFadeTime');
 const sidebar = document.getElementById('sidebar');
 const sidebarToggle = document.getElementById('sidebarToggle');
 const stopServerBtn = document.getElementById('stopServer');
+const appVersionEl = document.getElementById('appVersion');
 
 const SETTINGS_KEYS = {
   overlayTime: 'player:overlayTime',
@@ -703,7 +704,28 @@ function initServerControls() {
   stopServerBtn.addEventListener('click', stopServer);
 }
 
+async function loadVersion() {
+  if (!appVersionEl) return;
+
+  try {
+    const res = await fetch('/api/version');
+    if (!res.ok) {
+      throw new Error('Request failed');
+    }
+    const data = await res.json();
+    if (data && data.version) {
+      appVersionEl.textContent = `Версия: ${data.version}`;
+    } else {
+      appVersionEl.textContent = 'Версия: неизвестна';
+    }
+  } catch (err) {
+    console.error('Не удалось загрузить версию приложения', err);
+    appVersionEl.textContent = 'Версия: неизвестна';
+  }
+}
+
 initSettings();
 initSidebarToggle();
 initServerControls();
 loadTracks();
+loadVersion();
