@@ -104,6 +104,33 @@ body {
   max-width: 1600px;
 }
 
+.assets-panel {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 0;
+}
+
+.assets-status {
+  margin: 0 0 10px;
+  text-align: center;
+}
+
+.assets-tracks {
+  display: flex;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.assets-empty {
+  width: 100%;
+  text-align: center;
+  color: var(--muted);
+  margin: 12px 0 4px;
+}
+
 .settings {
   display: grid;
   gap: 12px;

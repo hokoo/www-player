@@ -1,5 +1,7 @@
 const zonesContainer = document.getElementById('zones');
 const statusEl = document.getElementById('status');
+const assetsContainer = document.getElementById('assetsTracks');
+const assetsStatusEl = document.getElementById('assetsStatus');
 const overlayTimeInput = document.getElementById('overlayTime');
 const overlayCurveSelect = document.getElementById('overlayCurve');
 const stopFadeInput = document.getElementById('stopFadeTime');
@@ -16,7 +18,7 @@ const SETTINGS_KEYS = {
 };
 
 let currentAudio = null;
-let currentFile = null;
+let currentTrack = null; // { file, basePath, key }
 let fadeCancel = { cancelled: false };
 let buttonsByFile = new Map();
 let cardsByFile = new Map();
@@ -26,12 +28,21 @@ let progressAudio = null;
 const MAX_ZONES = 5;
 let layout = Array.from({ length: MAX_ZONES }, () => []); // array of zones -> array of filenames
 let availableFiles = [];
+let assetFiles = [];
 
 function clampVolume(value) {
   if (!Number.isFinite(value)) return 0;
   if (value < 0) return 0;
   if (value > 1) return 1;
   return value;
+}
+
+function trackKey(file, basePath = '/audio') {
+  return `${basePath}|${file}`;
+}
+
+function trackDisplayName(file) {
+  return stripExtension(file);
 }
 
 function stripExtension(filename) {
@@ -57,6 +68,10 @@ function setStatus(message) {
   if (statusEl) statusEl.textContent = message;
 }
 
+function setAssetsStatus(message) {
+  if (assetsStatusEl) assetsStatusEl.textContent = message;
+}
+
 function loadSetting(key, fallback) {
   const value = localStorage.getItem(key);
   return value !== null ? value : fallback;
@@ -66,29 +81,37 @@ function saveSetting(key, value) {
   localStorage.setItem(key, value);
 }
 
-function volumeKey(file) {
-  return `player:volume:${file}`;
+function volumeKey(key) {
+  return `player:volume:${key}`;
 }
 
-function loadVolume(file) {
-  const saved = localStorage.getItem(volumeKey(file));
-  const parsed = saved !== null ? parseFloat(saved) : NaN;
+function loadVolume(file, basePath = '/audio') {
+  const key = trackKey(file, basePath);
+  const saved = localStorage.getItem(volumeKey(key));
+  let parsed = saved !== null ? parseFloat(saved) : NaN;
+
+  if (Number.isNaN(parsed) && basePath === '/audio') {
+    const legacy = localStorage.getItem(`player:volume:${file}`);
+    parsed = legacy !== null ? parseFloat(legacy) : NaN;
+  }
+
   if (Number.isNaN(parsed)) return 1;
   return clampVolume(parsed);
 }
 
-function saveVolume(file, value) {
-  localStorage.setItem(volumeKey(file), clampVolume(value).toString());
+function saveVolume(file, value, basePath = '/audio') {
+  const key = trackKey(file, basePath);
+  localStorage.setItem(volumeKey(key), clampVolume(value).toString());
 }
 
 function renderEmpty() {
   zonesContainer.innerHTML = '<div class="empty-state">В папке /audio не найдено аудиофайлов (mp3, wav, ogg, m4a, flac).</div>';
 }
 
-function setButtonPlaying(file, isPlaying) {
-  const btn = buttonsByFile.get(file);
-  const card = cardsByFile.get(file);
-  const progress = progressByFile.get(file);
+function setButtonPlaying(fileKey, isPlaying) {
+  const btn = buttonsByFile.get(fileKey);
+  const card = cardsByFile.get(fileKey);
+  const progress = progressByFile.get(fileKey);
   if (btn) {
     btn.textContent = isPlaying ? '■' : '▶';
     btn.title = isPlaying ? 'Остановить' : 'Воспроизвести';
@@ -111,8 +134,8 @@ function getDuration(audio) {
   return Number.isFinite(d) && d > 0 ? d : null;
 }
 
-function updateProgress(file, currentTime, duration) {
-  const entry = progressByFile.get(file);
+function updateProgress(fileKey, currentTime, duration) {
+  const entry = progressByFile.get(fileKey);
   if (!entry) return;
   const { bar } = entry;
 
@@ -126,14 +149,14 @@ function updateProgress(file, currentTime, duration) {
   bar.style.width = `${percent}%`;
 }
 
-function resetProgress(file) {
-  const entry = progressByFile.get(file);
+function resetProgress(fileKey) {
+  const entry = progressByFile.get(fileKey);
   if (!entry) return;
   entry.bar.style.width = '0%';
 }
 
-function bindProgress(audio, file) {
-  const update = () => updateProgress(file, audio.currentTime, getDuration(audio));
+function bindProgress(audio, fileKey) {
+  const update = () => updateProgress(fileKey, audio.currentTime, getDuration(audio));
   audio.addEventListener('timeupdate', update);
   audio.addEventListener('loadedmetadata', update);
   audio.addEventListener('seeking', update);
@@ -149,31 +172,33 @@ function stopProgressLoop() {
   progressAudio = null;
 }
 
-function startProgressLoop(audio, file) {
+function startProgressLoop(audio, fileKey) {
   stopProgressLoop();
   if (!audio) return;
   progressAudio = audio;
 
   const tick = () => {
     if (!progressAudio || progressAudio.paused) return;
-    updateProgress(file, progressAudio.currentTime, getDuration(progressAudio));
+    updateProgress(fileKey, progressAudio.currentTime, getDuration(progressAudio));
     progressRaf = requestAnimationFrame(tick);
   };
 
   tick();
 }
 
-function buildTrackCard(file) {
+function buildTrackCard(file, basePath = '/audio', { draggable = true } = {}) {
+  const key = trackKey(file, basePath);
   const card = document.createElement('div');
   card.className = 'track-card';
-  card.draggable = true;
+  card.draggable = draggable;
   card.dataset.file = file;
-  cardsByFile.set(file, card);
+  card.dataset.basePath = basePath;
+  cardsByFile.set(key, card);
 
   const info = document.createElement('div');
   const name = document.createElement('p');
   name.className = 'track-name';
-  name.textContent = stripExtension(file);
+  name.textContent = trackDisplayName(file);
   info.appendChild(name);
 
   const controls = document.createElement('div');
@@ -183,15 +208,15 @@ function buildTrackCard(file) {
   playButton.className = 'play';
   playButton.textContent = '▶';
   playButton.title = 'Воспроизвести';
-  playButton.addEventListener('click', () => handlePlay(file, playButton));
-  buttonsByFile.set(file, playButton);
+  playButton.addEventListener('click', () => handlePlay(file, playButton, basePath));
+  buttonsByFile.set(key, playButton);
 
   const progress = document.createElement('div');
   progress.className = 'play-progress';
   const progressBar = document.createElement('div');
   progressBar.className = 'play-progress__bar';
   progress.append(progressBar);
-  progressByFile.set(file, { container: progress, bar: progressBar });
+  progressByFile.set(key, { container: progress, bar: progressBar });
 
   const playBlock = document.createElement('div');
   playBlock.className = 'play-block';
@@ -204,7 +229,7 @@ function buildTrackCard(file) {
   volumeRange.min = '0';
   volumeRange.max = '1';
   volumeRange.step = '0.01';
-  volumeRange.value = loadVolume(file).toString();
+  volumeRange.value = loadVolume(file, basePath).toString();
 
   const enableDrag = () => {
     card.draggable = true;
@@ -223,8 +248,8 @@ function buildTrackCard(file) {
   volumeRange.addEventListener('input', () => {
     const numeric = clampVolume(parseFloat(volumeRange.value));
     volumeRange.value = numeric.toString();
-    saveVolume(file, numeric);
-    if (currentFile === file && currentAudio) {
+    saveVolume(file, numeric, basePath);
+    if (currentTrack && currentTrack.key === key && currentAudio) {
       currentAudio.volume = numeric;
     }
   });
@@ -232,7 +257,9 @@ function buildTrackCard(file) {
   volumeWrap.append(volumeRange);
   controls.append(playBlock, volumeWrap);
   card.append(info, controls);
-  attachDragHandlers(card);
+  if (draggable) {
+    attachDragHandlers(card);
+  }
   return card;
 }
 
@@ -254,6 +281,12 @@ function ensureZoneCount(zones) {
     normalized.push([]);
   }
   return normalized.map((zone) => (Array.isArray(zone) ? zone : []));
+}
+
+function resetTrackReferences() {
+  buttonsByFile = new Map();
+  cardsByFile = new Map();
+  progressByFile = new Map();
 }
 
 function loadLayout(files) {
@@ -290,9 +323,6 @@ function saveLayout() {
 
 function renderZones() {
   zonesContainer.innerHTML = '';
-  buttonsByFile = new Map();
-  cardsByFile = new Map();
-  progressByFile = new Map();
   layout = ensureZoneCount(layout);
 
   layout.forEach((zoneFiles, zoneIndex) => {
@@ -312,15 +342,30 @@ function renderZones() {
     const body = document.createElement('div');
     body.className = 'zone-body';
 
-    zoneFiles.forEach((file) => body.appendChild(buildTrackCard(file)));
+    zoneFiles.forEach((file) => body.appendChild(buildTrackCard(file, '/audio', { draggable: true })));
 
     zone.append(body);
     zonesContainer.appendChild(zone);
   });
+}
 
-  if (currentFile) {
-    setButtonPlaying(currentFile, !!(currentAudio && !currentAudio.paused));
+function renderAssetTracks() {
+  if (!assetsContainer) return;
+  assetsContainer.innerHTML = '';
+
+  if (!assetFiles.length) {
+    assetsContainer.innerHTML = '<p class="assets-empty">В папке /assets/audio не найдено аудиофайлов.</p>';
+    return;
   }
+
+  assetFiles.forEach((file) => {
+    assetsContainer.appendChild(buildTrackCard(file, '/assets/audio', { draggable: false }));
+  });
+}
+
+function syncCurrentTrackState() {
+  if (!currentTrack) return;
+  setButtonPlaying(currentTrack.key, !!(currentAudio && !currentAudio.paused));
 }
 
 function handleDrop(event, targetZoneIndex) {
@@ -360,25 +405,54 @@ function findZoneIndex(file) {
   return layout.findIndex((zone) => zone.includes(file));
 }
 
-async function fetchTracks() {
+async function fetchFileList(url) {
   try {
-    const res = await fetch('/api/audio');
+    const res = await fetch(url);
     if (!res.ok) throw new Error('Не удалось получить список файлов');
     const data = await res.json();
-    const files = Array.isArray(data.files) ? data.files : [];
-    if (!files.length) {
-      renderEmpty();
-      setStatus('Файлы не найдены. Добавьте аудио в папку /audio и обновите страницу.');
-      return;
-    }
-    loadLayout(files);
-    renderZones();
-    setStatus(`Найдено файлов: ${files.length}`);
+    return { files: Array.isArray(data.files) ? data.files : [], ok: true };
   } catch (err) {
     console.error(err);
-    renderEmpty();
-    setStatus('Ошибка загрузки списка файлов. Проверьте сервер.');
+    return { files: [], ok: false };
   }
+}
+
+async function loadTracks() {
+  const [audioResult, assetResult] = await Promise.all([
+    fetchFileList('/api/audio'),
+    fetchFileList('/api/assets-audio'),
+  ]);
+
+  assetFiles = assetResult.files;
+  resetTrackReferences();
+  renderAssetTracks();
+
+  if (assetResult.ok) {
+    setAssetsStatus('');
+  } else {
+    setAssetsStatus('Ошибка загрузки списка файлов из /assets/audio.');
+  }
+
+  if (!audioResult.ok) {
+    renderEmpty();
+    syncCurrentTrackState();
+    setStatus('Ошибка загрузки списка файлов. Проверьте сервер.');
+    return;
+  }
+
+  availableFiles = audioResult.files;
+
+  if (!availableFiles.length) {
+    renderEmpty();
+    syncCurrentTrackState();
+    setStatus('Файлы не найдены. Добавьте аудио в папку /audio и обновите страницу.');
+    return;
+  }
+
+  loadLayout(availableFiles);
+  renderZones();
+  syncCurrentTrackState();
+  setStatus(`Найдено файлов: ${availableFiles.length}`);
 }
 
 function resetFadeState() {
@@ -386,7 +460,7 @@ function resetFadeState() {
   fadeCancel = { cancelled: false };
 }
 
-function fadeOutAndStop(audio, durationSeconds, curve, file) {
+function fadeOutAndStop(audio, durationSeconds, curve, track) {
   return new Promise((resolve) => {
     let settled = false;
     const safeResolve = () => {
@@ -400,11 +474,11 @@ function fadeOutAndStop(audio, durationSeconds, curve, file) {
     if (duration === 0) {
       audio.pause();
       audio.currentTime = 0;
-      setButtonPlaying(file, false);
+      setButtonPlaying(track.key, false);
       stopProgressLoop();
-      if (currentFile === file) {
+      if (currentTrack && currentTrack.key === track.key) {
         currentAudio = null;
-        currentFile = null;
+        currentTrack = null;
       }
       return safeResolve();
     }
@@ -423,11 +497,11 @@ function fadeOutAndStop(audio, durationSeconds, curve, file) {
       } else {
         audio.pause();
         audio.currentTime = 0;
-        setButtonPlaying(file, false);
+        setButtonPlaying(track.key, false);
         stopProgressLoop();
-        if (currentFile === file) {
+        if (currentTrack && currentTrack.key === track.key) {
           currentAudio = null;
-          currentFile = null;
+          currentTrack = null;
         }
         safeResolve();
       }
@@ -437,39 +511,41 @@ function fadeOutAndStop(audio, durationSeconds, curve, file) {
   });
 }
 
-function createAudio(file) {
+function createAudio(track) {
+  const { file, basePath, key } = track;
   const encoded = encodeURIComponent(file);
-  const audio = new Audio(`/audio/${encoded}`);
+  const normalizedBase = basePath.endsWith('/') ? basePath.slice(0, -1) : basePath;
+  const audio = new Audio(`${normalizedBase}/${encoded}`);
   audio.preload = 'metadata';
   audio.load();
 
   audio.addEventListener('ended', () => {
-    if (currentFile === file) {
+    if (currentTrack && currentTrack.key === key) {
       setStatus(`Воспроизведение завершено: ${file}`);
       currentAudio = null;
-      currentFile = null;
+      currentTrack = null;
     }
-    setButtonPlaying(file, false);
+    setButtonPlaying(key, false);
     stopProgressLoop();
-    resetProgress(file);
+    resetProgress(key);
   });
 
   audio.addEventListener('error', () => {
     setStatus(`Ошибка воспроизведения: ${file}`);
-    setButtonPlaying(file, false);
+    setButtonPlaying(key, false);
     stopProgressLoop();
-    resetProgress(file);
-    if (currentFile === file) {
+    resetProgress(key);
+    if (currentTrack && currentTrack.key === key) {
       currentAudio = null;
-      currentFile = null;
+      currentTrack = null;
     }
   });
 
-  bindProgress(audio, file);
+  bindProgress(audio, key);
   return audio;
 }
 
-function applyOverlay(oldAudio, newAudio, targetVolume, overlaySeconds, curve, newFile, oldFile) {
+function applyOverlay(oldAudio, newAudio, targetVolume, overlaySeconds, curve, newTrack, oldTrack) {
   const safeTargetVolume = clampVolume(targetVolume);
   const start = performance.now();
   const duration = overlaySeconds * 1000;
@@ -492,35 +568,36 @@ function applyOverlay(oldAudio, newAudio, targetVolume, overlaySeconds, curve, n
         oldAudio.pause();
         oldAudio.currentTime = 0;
         oldAudio.volume = initialOldVolume;
-        if (oldFile) setButtonPlaying(oldFile, false);
+        if (oldTrack) setButtonPlaying(oldTrack.key, false);
       }
       currentAudio = newAudio;
-      currentFile = newFile;
-      setButtonPlaying(newFile, true);
-      startProgressLoop(newAudio, newFile);
-      setStatus(`Играет: ${newFile}`);
+      currentTrack = newTrack;
+      setButtonPlaying(newTrack.key, true);
+      startProgressLoop(newAudio, newTrack.key);
+      setStatus(`Играет: ${newTrack.file}`);
     }
   }
 
   requestAnimationFrame(step);
 }
 
-async function handlePlay(file, button) {
+async function handlePlay(file, button, basePath = '/audio') {
   const overlaySeconds = Math.max(0, parseFloat(overlayTimeInput.value) || 0);
   const curve = overlayCurveSelect.value;
   const stopFadeSeconds = Math.max(0, parseFloat(stopFadeInput.value) || 0);
-  const targetVolume = clampVolume(loadVolume(file));
+  const targetVolume = clampVolume(loadVolume(file, basePath));
+  const track = { file, basePath, key: trackKey(file, basePath) };
 
   button.disabled = true;
 
-  if (currentFile === file && currentAudio && !currentAudio.paused) {
-    await fadeOutAndStop(currentAudio, stopFadeSeconds, curve, file);
+  if (currentTrack && currentTrack.key === track.key && currentAudio && !currentAudio.paused) {
+    await fadeOutAndStop(currentAudio, stopFadeSeconds, curve, track);
     setStatus(`Остановлено: ${file}`);
     button.disabled = false;
     return;
   }
 
-  const audio = createAudio(file);
+  const audio = createAudio(track);
   audio.dataset.filename = file;
   audio.volume = overlaySeconds > 0 && currentAudio && !currentAudio.paused ? 0 : targetVolume;
 
@@ -528,30 +605,30 @@ async function handlePlay(file, button) {
     await audio.play();
 
     if (currentAudio && !currentAudio.paused && overlaySeconds > 0) {
-      const oldFile = currentFile;
-      setButtonPlaying(file, true);
-      startProgressLoop(audio, file);
-      applyOverlay(currentAudio, audio, targetVolume, overlaySeconds, curve, file, oldFile);
+      const oldTrack = currentTrack;
+      setButtonPlaying(track.key, true);
+      startProgressLoop(audio, track.key);
+      applyOverlay(currentAudio, audio, targetVolume, overlaySeconds, curve, track, oldTrack);
     } else {
       if (currentAudio) {
         currentAudio.pause();
         currentAudio.currentTime = 0;
-        if (currentFile) setButtonPlaying(currentFile, false);
+        if (currentTrack) setButtonPlaying(currentTrack.key, false);
       }
       resetFadeState();
       audio.volume = targetVolume;
       currentAudio = audio;
-      currentFile = file;
-      setButtonPlaying(file, true);
-      startProgressLoop(audio, file);
+      currentTrack = track;
+      setButtonPlaying(track.key, true);
+      startProgressLoop(audio, track.key);
       setStatus(`Играет: ${file}`);
     }
   } catch (err) {
     console.error(err);
     setStatus('Не удалось начать воспроизведение.');
-    setButtonPlaying(file, false);
+    setButtonPlaying(track.key, false);
     stopProgressLoop();
-    resetProgress(file);
+    resetProgress(track.key);
   } finally {
     button.disabled = false;
   }
@@ -629,4 +706,4 @@ function initServerControls() {
 initSettings();
 initSidebarToggle();
 initServerControls();
-fetchTracks();
+loadTracks();
