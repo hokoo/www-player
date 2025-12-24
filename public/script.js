@@ -37,6 +37,7 @@ const MAX_ZONES = 5;
 let layout = Array.from({ length: MAX_ZONES }, () => []); // array of zones -> array of filenames
 let availableFiles = [];
 let assetFiles = [];
+let shutdownCountdownTimer = null;
 
 function clampVolume(value) {
   if (!Number.isFinite(value)) return 0;
@@ -788,6 +789,33 @@ function setUpdateStatus(text) {
   updateStatusEl.textContent = text;
 }
 
+function startShutdownCountdown(seconds = 20) {
+  let remaining = Math.max(0, Math.floor(seconds));
+
+  if (shutdownCountdownTimer) {
+    clearTimeout(shutdownCountdownTimer);
+    shutdownCountdownTimer = null;
+  }
+
+  const tick = () => {
+    if (remaining <= 0) {
+      shutdownCountdownTimer = null;
+      if (stopServerBtn) {
+        stopServerBtn.click();
+      } else {
+        stopServer();
+      }
+      return;
+    }
+
+    setUpdateMessage(`Обновление загружено, приложение будет закрыто через ${remaining} с.`);
+    remaining -= 1;
+    shutdownCountdownTimer = setTimeout(tick, 1000);
+  };
+
+  tick();
+}
+
 async function checkForUpdates() {
   if (!updateInfoEl || !updateMessageEl || !updateButton) return;
 
@@ -838,15 +866,7 @@ async function applyUpdate() {
 
     const message = (data && (data.message || data.error)) || 'Обновление выполнено';
     setUpdateStatus(message);
-    setUpdateMessage('Обновление загружено, приложение будет закрыто.');
-
-    setTimeout(() => {
-      if (stopServerBtn) {
-        stopServerBtn.click();
-      } else {
-        stopServer();
-      }
-    }, 300);
+    startShutdownCountdown(20);
   } catch (err) {
     console.error('Ошибка при обновлении', err);
     setUpdateStatus(err.message);
