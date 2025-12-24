@@ -428,11 +428,7 @@ async function loadTracks() {
   renderAssetTracks();
 
   if (assetResult.ok) {
-    setAssetsStatus(
-      assetFiles.length
-        ? `Найдено файлов: ${assetFiles.length}`
-        : 'Файлы не найдены. Добавьте аудио в /assets/audio и обновите страницу.',
-    );
+    setAssetsStatus('');
   } else {
     setAssetsStatus('Ошибка загрузки списка файлов из /assets/audio.');
   }
