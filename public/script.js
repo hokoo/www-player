@@ -751,10 +751,11 @@ function resetUpdateUi() {
   showUpdateBlock(false);
 }
 
-function setReleaseLink(url) {
+function setReleaseLink(url, label = 'Релиз') {
   if (!releaseLinkEl) return;
   if (url) {
     releaseLinkEl.href = url;
+    releaseLinkEl.textContent = label;
     releaseLinkEl.style.display = 'inline';
   } else {
     releaseLinkEl.style.display = 'none';
@@ -788,8 +789,9 @@ async function checkForUpdates() {
     }
 
     if (data && data.hasUpdate && data.latestVersion) {
-      setUpdateMessage(`Доступна новая версия v${data.latestVersion}`);
-      setReleaseLink(data.releaseUrl || null);
+      const releaseLabel = data.releaseName || `v${data.latestVersion}`;
+      setUpdateMessage(`Доступен релиз: ${releaseLabel}`);
+      setReleaseLink(data.releaseUrl || null, releaseLabel);
       updateButton.disabled = false;
       showUpdateBlock(true);
     }

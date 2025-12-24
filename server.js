@@ -186,6 +186,7 @@ async function getLatestReleaseInfo(currentVersion) {
       tarballUrl: release && release.tarball_url,
       htmlUrl: release && release.html_url,
       isPrerelease: false,
+      releaseName: release && release.name,
     };
   }
 
@@ -198,6 +199,7 @@ async function getLatestReleaseInfo(currentVersion) {
       tarballUrl: prerelease && prerelease.tarball_url,
       htmlUrl: prerelease && prerelease.html_url,
       isPrerelease: true,
+      releaseName: prerelease && prerelease.name,
     };
   }
 
@@ -206,6 +208,7 @@ async function getLatestReleaseInfo(currentVersion) {
     tarballUrl: release && release.tarball_url,
     htmlUrl: release && release.html_url,
     isPrerelease: false,
+    releaseName: release && release.name,
   };
 }
 
@@ -365,7 +368,7 @@ function handleApiVersion(req, res) {
 
 async function handleUpdateCheck(req, res) {
   try {
-    const { latestVersion, htmlUrl, isPrerelease } = await getLatestReleaseInfo(appVersion);
+    const { latestVersion, htmlUrl, isPrerelease, releaseName } = await getLatestReleaseInfo(appVersion);
     const comparableLatest = latestVersion || null;
     const hasUpdate = comparableLatest ? compareVersions(comparableLatest, appVersion) > 0 : false;
 
@@ -375,6 +378,7 @@ async function handleUpdateCheck(req, res) {
       hasUpdate,
       releaseUrl: htmlUrl || null,
       isPrerelease: Boolean(isPrerelease),
+      releaseName: releaseName || null,
     });
   } catch (err) {
     console.error('Update check failed', err);
