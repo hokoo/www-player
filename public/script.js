@@ -50,6 +50,8 @@ const HOTKEY_CODES = [
   ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG'],
   ['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB'],
 ];
+const ASSET_HOTKEY_LABELS = ['=', '-', '0', '9', '8'];
+const ASSET_HOTKEY_CODES = ['Equal', 'Minus', 'Digit0', 'Digit9', 'Digit8'];
 
 function clampVolume(value) {
   if (!Number.isFinite(value)) return 0;
@@ -389,8 +391,9 @@ function renderAssetTracks() {
     return;
   }
 
-  assetFiles.forEach((file) => {
-    assetsContainer.appendChild(buildTrackCard(file, '/assets/audio', { draggable: false }));
+  assetFiles.forEach((file, index) => {
+    const hotkeyLabel = ASSET_HOTKEY_LABELS[index] ?? null;
+    assetsContainer.appendChild(buildTrackCard(file, '/assets/audio', { draggable: false, hotkeyLabel }));
   });
 }
 
@@ -922,7 +925,18 @@ function handleHotkey(event) {
     return;
   }
   const rowIndex = HOTKEY_CODES.findIndex((row) => row.includes(code));
-  if (rowIndex === -1) return;
+  if (rowIndex === -1) {
+    const assetIndex = ASSET_HOTKEY_CODES.indexOf(code);
+    if (assetIndex === -1) return;
+    const file = assetFiles[assetIndex];
+    if (!file) return;
+    const fileKey = trackKey(file, '/assets/audio');
+    const button = buttonsByFile.get(fileKey);
+    if (!button) return;
+    event.preventDefault();
+    handlePlay(file, button, '/assets/audio');
+    return;
+  }
   const zoneIndex = HOTKEY_CODES[rowIndex].indexOf(code);
   const zoneFiles = layout[zoneIndex];
   if (!zoneFiles || zoneFiles.length <= rowIndex) return;
