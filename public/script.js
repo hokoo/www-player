@@ -56,8 +56,9 @@ function trackKey(file, basePath = '/audio') {
   return `${basePath}|${file}`;
 }
 
-function trackDisplayName(file) {
-  return stripExtension(file);
+function trackDisplayName(file, hotkeyLabel) {
+  const name = stripExtension(file);
+  return hotkeyLabel ? `${hotkeyLabel} ${name}` : name;
 }
 
 function stripExtension(filename) {
@@ -207,7 +208,7 @@ function startProgressLoop(audio, fileKey) {
   tick();
 }
 
-function buildTrackCard(file, basePath = '/audio', { draggable = true } = {}) {
+function buildTrackCard(file, basePath = '/audio', { draggable = true, hotkeyLabel = null } = {}) {
   const key = trackKey(file, basePath);
   const card = document.createElement('div');
   card.className = 'track-card';
@@ -219,7 +220,7 @@ function buildTrackCard(file, basePath = '/audio', { draggable = true } = {}) {
   const info = document.createElement('div');
   const name = document.createElement('p');
   name.className = 'track-name';
-  name.textContent = trackDisplayName(file);
+  name.textContent = trackDisplayName(file, hotkeyLabel);
   info.appendChild(name);
 
   const controls = document.createElement('div');
@@ -363,7 +364,10 @@ function renderZones() {
     const body = document.createElement('div');
     body.className = 'zone-body';
 
-    zoneFiles.forEach((file) => body.appendChild(buildTrackCard(file, '/audio', { draggable: true })));
+    zoneFiles.forEach((file, rowIndex) => {
+      const hotkeyLabel = HOTKEY_ROWS[rowIndex]?.[zoneIndex]?.toUpperCase() ?? null;
+      body.appendChild(buildTrackCard(file, '/audio', { draggable: true, hotkeyLabel }));
+    });
 
     zone.append(body);
     zonesContainer.appendChild(zone);
