@@ -40,9 +40,15 @@ let assetFiles = [];
 let shutdownCountdownTimer = null;
 const HOTKEY_ROWS = [
   ['1', '2', '3', '4', '5'],
-  ['q', 'w', 'e', 'r', 't'],
-  ['a', 's', 'd', 'f', 'g'],
-  ['z', 'x', 'c', 'v', 'b'],
+  ['Q', 'W', 'E', 'R', 'T'],
+  ['A', 'S', 'D', 'F', 'G'],
+  ['Z', 'X', 'C', 'V', 'B'],
+];
+const HOTKEY_CODES = [
+  ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'],
+  ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT'],
+  ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG'],
+  ['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB'],
 ];
 
 function clampVolume(value) {
@@ -365,7 +371,7 @@ function renderZones() {
     body.className = 'zone-body';
 
     zoneFiles.forEach((file, rowIndex) => {
-      const hotkeyLabel = HOTKEY_ROWS[rowIndex]?.[zoneIndex]?.toUpperCase() ?? null;
+      const hotkeyLabel = HOTKEY_ROWS[rowIndex]?.[zoneIndex] ?? null;
       body.appendChild(buildTrackCard(file, '/audio', { draggable: true, hotkeyLabel }));
     });
 
@@ -903,8 +909,8 @@ function handleHotkey(event) {
   if (event.metaKey || event.ctrlKey || event.altKey) return;
   if (isEditableTarget(event.target)) return;
 
-  const key = event.key.toLowerCase();
-  if (key === ' ') {
+  const { code } = event;
+  if (code === 'Space') {
     if (currentAudio && currentTrack) {
       event.preventDefault();
       const stopFadeSeconds = Math.max(0, parseFloat(stopFadeInput.value) || 0);
@@ -915,9 +921,9 @@ function handleHotkey(event) {
     }
     return;
   }
-  const rowIndex = HOTKEY_ROWS.findIndex((row) => row.includes(key));
+  const rowIndex = HOTKEY_CODES.findIndex((row) => row.includes(code));
   if (rowIndex === -1) return;
-  const zoneIndex = HOTKEY_ROWS[rowIndex].indexOf(key);
+  const zoneIndex = HOTKEY_CODES[rowIndex].indexOf(code);
   const zoneFiles = layout[zoneIndex];
   if (!zoneFiles || zoneFiles.length <= rowIndex) return;
   const file = zoneFiles[rowIndex];
