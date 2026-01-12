@@ -904,6 +904,17 @@ function handleHotkey(event) {
   if (isEditableTarget(event.target)) return;
 
   const key = event.key.toLowerCase();
+  if (key === ' ') {
+    if (currentAudio && currentTrack) {
+      event.preventDefault();
+      const stopFadeSeconds = Math.max(0, parseFloat(stopFadeInput.value) || 0);
+      const curve = overlayCurveSelect.value;
+      fadeOutAndStop(currentAudio, stopFadeSeconds, curve, currentTrack).then(() => {
+        setStatus(`Остановлено: ${currentTrack ? currentTrack.file : ''}`.trim());
+      });
+    }
+    return;
+  }
   const rowIndex = HOTKEY_ROWS.findIndex((row) => row.includes(key));
   if (rowIndex === -1) return;
   const zoneIndex = HOTKEY_ROWS[rowIndex].indexOf(key);
