@@ -38,6 +38,12 @@ let layout = Array.from({ length: MAX_ZONES }, () => []); // array of zones -> a
 let availableFiles = [];
 let assetFiles = [];
 let shutdownCountdownTimer = null;
+const HOTKEY_ROWS = [
+  ['1', '2', '3', '4', '5'],
+  ['q', 'w', 'e', 'r', 't'],
+  ['a', 's', 'd', 'f', 'g'],
+  ['z', 'x', 'c', 'v', 'b'],
+];
 
 function clampVolume(value) {
   if (!Number.isFinite(value)) return 0;
@@ -881,9 +887,38 @@ async function applyUpdate() {
   }
 }
 
+function isEditableTarget(target) {
+  if (!target) return false;
+  if (target.isContentEditable) return true;
+  const tag = target.tagName ? target.tagName.toLowerCase() : '';
+  return tag === 'input' || tag === 'textarea' || tag === 'select';
+}
+
+function handleHotkey(event) {
+  if (event.repeat) return;
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+  if (isEditableTarget(event.target)) return;
+
+  const key = event.key.toLowerCase();
+  const rowIndex = HOTKEY_ROWS.findIndex((row) => row.includes(key));
+  if (rowIndex === -1) return;
+  const zoneIndex = HOTKEY_ROWS[rowIndex].indexOf(key);
+  const zoneFiles = layout[zoneIndex];
+  if (!zoneFiles || zoneFiles.length <= rowIndex) return;
+  const file = zoneFiles[rowIndex];
+  if (!file) return;
+
+  const fileKey = trackKey(file, '/audio');
+  const button = buttonsByFile.get(fileKey);
+  if (!button) return;
+  event.preventDefault();
+  handlePlay(file, button, '/audio');
+}
+
 initSettings();
 initSidebarToggle();
 initServerControls();
 initUpdater();
 loadTracks();
 loadVersion();
+document.addEventListener('keydown', handleHotkey);
