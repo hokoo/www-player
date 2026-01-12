@@ -392,7 +392,8 @@ function renderAssetTracks() {
   }
 
   assetFiles.forEach((file, index) => {
-    const hotkeyLabel = ASSET_HOTKEY_LABELS[index] ?? null;
+    const reversedIndex = assetFiles.length - 1 - index;
+    const hotkeyLabel = ASSET_HOTKEY_LABELS[reversedIndex] ?? null;
     assetsContainer.appendChild(buildTrackCard(file, '/assets/audio', { draggable: false, hotkeyLabel }));
   });
 }
@@ -928,7 +929,8 @@ function handleHotkey(event) {
   if (rowIndex === -1) {
     const assetIndex = ASSET_HOTKEY_CODES.indexOf(code);
     if (assetIndex === -1) return;
-    const file = assetFiles[assetIndex];
+    const reversedIndex = assetFiles.length - 1 - assetIndex;
+    const file = assetFiles[reversedIndex];
     if (!file) return;
     const fileKey = trackKey(file, '/assets/audio');
     const button = buttonsByFile.get(fileKey);
