@@ -33,6 +33,8 @@ let cardsByFile = new Map();
 let progressByFile = new Map();
 let progressRaf = null;
 let progressAudio = null;
+let draggingCard = null;
+let dragDropHandled = false;
 const MAX_ZONES = 5;
 let layout = Array.from({ length: MAX_ZONES }, () => []); // array of zones -> array of filenames
 let availableFiles = [];
@@ -298,11 +300,59 @@ function attachDragHandlers(card) {
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', card.dataset.file);
     card.classList.add('dragging');
+    draggingCard = card;
+    dragDropHandled = false;
   });
 
   card.addEventListener('dragend', () => {
     card.classList.remove('dragging');
+    if (!dragDropHandled) {
+      renderZones();
+    }
+    draggingCard = null;
+    dragDropHandled = false;
+    document.querySelectorAll('.zone.drag-over').forEach((zone) => zone.classList.remove('drag-over'));
   });
+}
+
+function getDragInsertBefore(container, event) {
+  const draggableCards = Array.from(container.querySelectorAll('.track-card:not(.dragging)'));
+  const cursorY = event.clientY;
+  return draggableCards.reduce(
+    (closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = cursorY - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) {
+        return { offset, element: child };
+      }
+      return closest;
+    },
+    { offset: Number.NEGATIVE_INFINITY, element: null },
+  ).element;
+}
+
+function applyDragPreview(zoneBody, event) {
+  if (!draggingCard || !zoneBody) return;
+  event.preventDefault();
+  const beforeElement = getDragInsertBefore(zoneBody, event);
+  if (beforeElement) {
+    zoneBody.insertBefore(draggingCard, beforeElement);
+  } else {
+    zoneBody.appendChild(draggingCard);
+  }
+}
+
+function syncLayoutFromDom() {
+  const zones = Array.from(zonesContainer.querySelectorAll('.zone'));
+  const nextLayout = zones.map((zone) => {
+    const body = zone.querySelector('.zone-body');
+    if (!body) return [];
+    return Array.from(body.querySelectorAll('.track-card'))
+      .map((card) => card.dataset.file)
+      .filter(Boolean);
+  });
+  layout = ensureZoneCount(nextLayout);
+  saveLayout();
 }
 
 function ensureZoneCount(zones) {
@@ -377,6 +427,8 @@ function renderZones() {
       body.appendChild(buildTrackCard(file, '/audio', { draggable: true, hotkeyLabel }));
     });
 
+    body.addEventListener('dragover', (e) => applyDragPreview(body, e));
+
     zone.append(body);
     zonesContainer.appendChild(zone);
   });
@@ -411,29 +463,11 @@ function handleDrop(event, targetZoneIndex) {
 
   const targetZone = event.currentTarget;
   targetZone.classList.remove('drag-over');
+  dragDropHandled = true;
 
-  const zoneFiles = layout[targetZoneIndex];
-  const dropTargetCard = event.target.closest('.track-card');
-  const beforeFile = dropTargetCard ? dropTargetCard.dataset.file : null;
-
-  moveFile(sourceZoneIndex, targetZoneIndex, file, beforeFile);
+  syncLayoutFromDom();
   renderZones();
   setStatus('Раскладка обновлена и сохранена.');
-}
-
-function moveFile(fromZone, toZone, file, beforeFile) {
-  if (fromZone === -1 || toZone === -1) return;
-  const normalizedLayout = ensureZoneCount(layout);
-  const sourceList = normalizedLayout[fromZone];
-  const idx = sourceList.indexOf(file);
-  if (idx !== -1) {
-    sourceList.splice(idx, 1);
-  }
-  const targetList = normalizedLayout[toZone];
-  const insertIndex = beforeFile ? Math.max(0, targetList.indexOf(beforeFile)) : targetList.length;
-  targetList.splice(insertIndex, 0, file);
-  layout = ensureZoneCount(normalizedLayout);
-  saveLayout();
 }
 
 function findZoneIndex(file) {
