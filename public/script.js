@@ -50,8 +50,8 @@ const HOTKEY_CODES = [
   ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG'],
   ['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB'],
 ];
-const ASSET_HOTKEY_LABELS = ['=', '-', '0', '9', '8'];
-const ASSET_HOTKEY_CODES = ['Equal', 'Minus', 'Digit0', 'Digit9', 'Digit8'];
+const ASSET_HOTKEY_LABELS = ['0', '9', '8', '7', '6'];
+const ASSET_HOTKEY_CODES = ['Digit0', 'Digit9', 'Digit8', 'Digit7', 'Digit6'];
 
 function clampVolume(value) {
   if (!Number.isFinite(value)) return 0;
@@ -66,7 +66,7 @@ function trackKey(file, basePath = '/audio') {
 
 function trackDisplayName(file, hotkeyLabel) {
   const name = stripExtension(file);
-  return hotkeyLabel ? `${hotkeyLabel} ${name}` : name;
+  return hotkeyLabel ? `${hotkeyLabel}: ${name}` : name;
 }
 
 function stripExtension(filename) {
