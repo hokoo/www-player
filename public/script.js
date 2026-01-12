@@ -38,6 +38,20 @@ let layout = Array.from({ length: MAX_ZONES }, () => []); // array of zones -> a
 let availableFiles = [];
 let assetFiles = [];
 let shutdownCountdownTimer = null;
+const HOTKEY_ROWS = [
+  ['1', '2', '3', '4', '5'],
+  ['Q', 'W', 'E', 'R', 'T'],
+  ['A', 'S', 'D', 'F', 'G'],
+  ['Z', 'X', 'C', 'V', 'B'],
+];
+const HOTKEY_CODES = [
+  ['Digit1', 'Digit2', 'Digit3', 'Digit4', 'Digit5'],
+  ['KeyQ', 'KeyW', 'KeyE', 'KeyR', 'KeyT'],
+  ['KeyA', 'KeyS', 'KeyD', 'KeyF', 'KeyG'],
+  ['KeyZ', 'KeyX', 'KeyC', 'KeyV', 'KeyB'],
+];
+const ASSET_HOTKEY_LABELS = ['0', '9', '8', '7', '6'];
+const ASSET_HOTKEY_CODES = ['Digit0', 'Digit9', 'Digit8', 'Digit7', 'Digit6'];
 
 function clampVolume(value) {
   if (!Number.isFinite(value)) return 0;
@@ -50,8 +64,9 @@ function trackKey(file, basePath = '/audio') {
   return `${basePath}|${file}`;
 }
 
-function trackDisplayName(file) {
-  return stripExtension(file);
+function trackDisplayName(file, hotkeyLabel) {
+  const name = stripExtension(file);
+  return hotkeyLabel ? `${hotkeyLabel}: ${name}` : name;
 }
 
 function stripExtension(filename) {
@@ -201,7 +216,7 @@ function startProgressLoop(audio, fileKey) {
   tick();
 }
 
-function buildTrackCard(file, basePath = '/audio', { draggable = true } = {}) {
+function buildTrackCard(file, basePath = '/audio', { draggable = true, hotkeyLabel = null } = {}) {
   const key = trackKey(file, basePath);
   const card = document.createElement('div');
   card.className = 'track-card';
@@ -213,7 +228,7 @@ function buildTrackCard(file, basePath = '/audio', { draggable = true } = {}) {
   const info = document.createElement('div');
   const name = document.createElement('p');
   name.className = 'track-name';
-  name.textContent = trackDisplayName(file);
+  name.textContent = trackDisplayName(file, hotkeyLabel);
   info.appendChild(name);
 
   const controls = document.createElement('div');
@@ -357,7 +372,10 @@ function renderZones() {
     const body = document.createElement('div');
     body.className = 'zone-body';
 
-    zoneFiles.forEach((file) => body.appendChild(buildTrackCard(file, '/audio', { draggable: true })));
+    zoneFiles.forEach((file, rowIndex) => {
+      const hotkeyLabel = HOTKEY_ROWS[rowIndex]?.[zoneIndex] ?? null;
+      body.appendChild(buildTrackCard(file, '/audio', { draggable: true, hotkeyLabel }));
+    });
 
     zone.append(body);
     zonesContainer.appendChild(zone);
@@ -373,8 +391,10 @@ function renderAssetTracks() {
     return;
   }
 
-  assetFiles.forEach((file) => {
-    assetsContainer.appendChild(buildTrackCard(file, '/assets/audio', { draggable: false }));
+  assetFiles.forEach((file, index) => {
+    const reversedIndex = assetFiles.length - 1 - index;
+    const hotkeyLabel = ASSET_HOTKEY_LABELS[reversedIndex] ?? null;
+    assetsContainer.appendChild(buildTrackCard(file, '/assets/audio', { draggable: false, hotkeyLabel }));
   });
 }
 
@@ -881,9 +901,61 @@ async function applyUpdate() {
   }
 }
 
+function isEditableTarget(target) {
+  if (!target) return false;
+  if (target.isContentEditable) return true;
+  const tag = target.tagName ? target.tagName.toLowerCase() : '';
+  return tag === 'input' || tag === 'textarea' || tag === 'select';
+}
+
+function handleHotkey(event) {
+  if (event.repeat) return;
+  if (event.metaKey || event.ctrlKey || event.altKey) return;
+  if (isEditableTarget(event.target)) return;
+
+  const { code } = event;
+  if (code === 'Space') {
+    if (currentAudio && currentTrack) {
+      event.preventDefault();
+      const stopFadeSeconds = Math.max(0, parseFloat(stopFadeInput.value) || 0);
+      const curve = overlayCurveSelect.value;
+      fadeOutAndStop(currentAudio, stopFadeSeconds, curve, currentTrack).then(() => {
+        setStatus(`Остановлено: ${currentTrack ? currentTrack.file : ''}`.trim());
+      });
+    }
+    return;
+  }
+  const rowIndex = HOTKEY_CODES.findIndex((row) => row.includes(code));
+  if (rowIndex === -1) {
+    const assetIndex = ASSET_HOTKEY_CODES.indexOf(code);
+    if (assetIndex === -1) return;
+    const reversedIndex = assetFiles.length - 1 - assetIndex;
+    const file = assetFiles[reversedIndex];
+    if (!file) return;
+    const fileKey = trackKey(file, '/assets/audio');
+    const button = buttonsByFile.get(fileKey);
+    if (!button) return;
+    event.preventDefault();
+    handlePlay(file, button, '/assets/audio');
+    return;
+  }
+  const zoneIndex = HOTKEY_CODES[rowIndex].indexOf(code);
+  const zoneFiles = layout[zoneIndex];
+  if (!zoneFiles || zoneFiles.length <= rowIndex) return;
+  const file = zoneFiles[rowIndex];
+  if (!file) return;
+
+  const fileKey = trackKey(file, '/audio');
+  const button = buttonsByFile.get(fileKey);
+  if (!button) return;
+  event.preventDefault();
+  handlePlay(file, button, '/audio');
+}
+
 initSettings();
 initSidebarToggle();
 initServerControls();
 initUpdater();
 loadTracks();
 loadVersion();
+document.addEventListener('keydown', handleHotkey);
